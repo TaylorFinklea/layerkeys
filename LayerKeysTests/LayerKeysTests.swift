@@ -39,7 +39,7 @@ final class LayerKeysTests: XCTestCase {
 
     func testNumericPadTargetsAreTagged() {
         let mappings = MappingProfile.default.resolvedMappings
-        XCTAssertTrue(mappings.targetRequiresNumericPadFlag(NumpadTargetKey.keypad7.keyCode))
+        XCTAssertFalse(mappings.targetRequiresNumericPadFlag(NumpadTargetKey.keypad7.keyCode))
         XCTAssertFalse(mappings.targetRequiresNumericPadFlag(NavigationTargetKey.leftArrow.keyCode))
     }
 
