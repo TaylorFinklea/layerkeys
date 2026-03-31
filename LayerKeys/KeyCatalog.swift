@@ -214,7 +214,7 @@ struct MappingProfile: Codable, Hashable {
     var navigation: [NavigationBinding]
     var numpad: [NumpadBinding]
 
-    static let `default` = MappingProfile(
+    static let legacyDefault = MappingProfile(
         navigation: [
             NavigationBinding(source: .h, target: .leftArrow),
             NavigationBinding(source: .j, target: .downArrow),
@@ -233,6 +233,26 @@ struct MappingProfile: Codable, Hashable {
             NumpadBinding(source: .period, target: .keypad3),
             NumpadBinding(source: .space, target: .keypad0),
             NumpadBinding(source: .semicolon, target: .keypadDecimal),
+        ]
+    )
+
+    static let `default` = MappingProfile(
+        navigation: [
+            NavigationBinding(source: .h, target: .leftArrow),
+            NavigationBinding(source: .j, target: .downArrow),
+            NavigationBinding(source: .k, target: .upArrow),
+            NavigationBinding(source: .l, target: .rightArrow),
+        ],
+        numpad: [
+            NumpadBinding(source: .u, target: .keypad7),
+            NumpadBinding(source: .i, target: .keypad8),
+            NumpadBinding(source: .o, target: .keypad9),
+            NumpadBinding(source: .j, target: .keypad4),
+            NumpadBinding(source: .k, target: .keypad5),
+            NumpadBinding(source: .l, target: .keypad6),
+            NumpadBinding(source: .m, target: .keypad1),
+            NumpadBinding(source: .comma, target: .keypad2),
+            NumpadBinding(source: .period, target: .keypad3),
         ]
     )
 

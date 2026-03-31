@@ -19,6 +19,11 @@ struct MappingStore {
             return .default
         }
 
+        if profile == .legacyDefault {
+            try? save(.default)
+            return .default
+        }
+
         return profile
     }
 
