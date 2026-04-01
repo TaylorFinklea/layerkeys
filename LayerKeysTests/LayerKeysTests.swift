@@ -2,16 +2,18 @@ import XCTest
 @testable import LayerKeys
 
 final class LayerKeysTests: XCTestCase {
-    func testGlobeKeyEntersNavigationMode() {
+    private let triggerDownTimestamp: UInt64 = 1_000_000_000
+
+    func testEscapeTriggerEntersNavigationMode() {
         var machine = LayerStateMachine()
 
-        XCTAssertTrue(machine.handleModifierChange(isGlobeKeyHeld: true))
+        XCTAssertTrue(machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp))
         XCTAssertEqual(machine.mode, .nav)
     }
 
-    func testTriggerKeySwitchesToNumpadUntilGlobeReleased() {
+    func testTriggerKeySwitchesToNumpadUntilEscapeReleased() {
         var machine = LayerStateMachine()
-        _ = machine.handleModifierChange(isGlobeKeyHeld: true)
+        _ = machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp)
 
         XCTAssertTrue(machine.handleKeyEvent(keyCode: InputKey.a.keyCode, isKeyDown: true))
         XCTAssertEqual(machine.mode, .numpad)
@@ -19,8 +21,53 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertTrue(machine.handleKeyEvent(keyCode: InputKey.a.keyCode, isKeyDown: false))
         XCTAssertEqual(machine.mode, .numpad)
 
-        XCTAssertTrue(machine.handleModifierChange(isGlobeKeyHeld: false))
+        let result = machine.handleTriggerKeyUp(timestamp: triggerDownTimestamp + 50_000_000)
+        XCTAssertTrue(result.modeDidChange)
+        XCTAssertFalse(result.shouldEmitEscape)
         XCTAssertEqual(machine.mode, .off)
+    }
+
+    func testHoldingAThenPressingEscapeStartsInNumpadMode() {
+        var machine = LayerStateMachine()
+
+        XCTAssertFalse(machine.handleKeyEvent(keyCode: InputKey.a.keyCode, isKeyDown: true))
+        XCTAssertTrue(machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp))
+        XCTAssertEqual(machine.mode, .numpad)
+
+        XCTAssertTrue(machine.handleKeyEvent(keyCode: InputKey.a.keyCode, isKeyDown: false))
+        let result = machine.handleTriggerKeyUp(timestamp: triggerDownTimestamp + 50_000_000)
+        XCTAssertFalse(result.shouldEmitEscape)
+        XCTAssertEqual(machine.mode, .off)
+    }
+
+    func testTapEscapeEmitsEscapeOnTriggerRelease() {
+        var machine = LayerStateMachine()
+        _ = machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp)
+
+        let result = machine.handleTriggerKeyUp(timestamp: triggerDownTimestamp + 50_000_000)
+        XCTAssertTrue(result.modeDidChange)
+        XCTAssertTrue(result.shouldEmitEscape)
+        XCTAssertEqual(machine.mode, .off)
+    }
+
+    func testHoldingEscapeDoesNotEmitEscapeOnRelease() {
+        var machine = LayerStateMachine()
+        _ = machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp)
+
+        let result = machine.handleTriggerKeyUp(timestamp: triggerDownTimestamp + 500_000_000)
+        XCTAssertTrue(result.modeDidChange)
+        XCTAssertFalse(result.shouldEmitEscape)
+        XCTAssertEqual(machine.mode, .off)
+    }
+
+    func testUsingAnotherKeySuppressesTapEscape() {
+        var machine = LayerStateMachine()
+        _ = machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp)
+
+        XCTAssertFalse(machine.handleKeyEvent(keyCode: InputKey.q.keyCode, isKeyDown: true))
+
+        let result = machine.handleTriggerKeyUp(timestamp: triggerDownTimestamp + 50_000_000)
+        XCTAssertFalse(result.shouldEmitEscape)
     }
 
     func testResolvedMappingsPreferNumpadWhileActive() {

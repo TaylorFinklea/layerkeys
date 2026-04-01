@@ -1,33 +1,79 @@
 import CoreGraphics
 import Foundation
 
+struct TriggerKeyReleaseResult {
+    let modeDidChange: Bool
+    let shouldEmitEscape: Bool
+}
+
 struct LayerStateMachine {
     private(set) var mode: LayerMode = .off
-    private(set) var isGlobeKeyHeld = false
+    private(set) var isLayerTriggerHeld = false
+    private(set) var isNumpadTriggerHeld = false
     private(set) var shouldSwallowTriggerKeyUp = false
+    private(set) var shouldEmitEscapeOnTriggerKeyUp = false
+    private(set) var triggerKeyDownTimestamp: UInt64?
 
+    static let layerTriggerKeyCode: KeyCode = 0x35
     static let numpadTriggerKeyCode = InputKey.a.keyCode
+    static let escapeTapThreshold: UInt64 = 200_000_000
 
     @discardableResult
-    mutating func handleModifierChange(isGlobeKeyHeld: Bool) -> Bool {
-        guard self.isGlobeKeyHeld != isGlobeKeyHeld else {
+    mutating func handleTriggerKeyDown(timestamp: UInt64) -> Bool {
+        guard !isLayerTriggerHeld else {
             return false
         }
 
-        self.isGlobeKeyHeld = isGlobeKeyHeld
-        if isGlobeKeyHeld {
-            mode = .nav
-        } else {
-            mode = .off
-            shouldSwallowTriggerKeyUp = false
+        isLayerTriggerHeld = true
+        triggerKeyDownTimestamp = timestamp
+        let nextMode: LayerMode = isNumpadTriggerHeld ? .numpad : .nav
+        shouldEmitEscapeOnTriggerKeyUp = nextMode == .nav
+        let didChange = mode != nextMode
+        mode = nextMode
+        if isNumpadTriggerHeld {
+            shouldSwallowTriggerKeyUp = true
         }
-        return true
+        return didChange
+    }
+
+    mutating func handleTriggerKeyUp(timestamp: UInt64) -> TriggerKeyReleaseResult {
+        guard isLayerTriggerHeld else {
+            return TriggerKeyReleaseResult(modeDidChange: false, shouldEmitEscape: false)
+        }
+
+        let wasQuickTap: Bool
+        if let triggerKeyDownTimestamp {
+            wasQuickTap = timestamp >= triggerKeyDownTimestamp
+                && (timestamp - triggerKeyDownTimestamp) < Self.escapeTapThreshold
+        } else {
+            wasQuickTap = false
+        }
+
+        let result = TriggerKeyReleaseResult(
+            modeDidChange: mode != .off,
+            shouldEmitEscape: shouldEmitEscapeOnTriggerKeyUp && wasQuickTap
+        )
+
+        isLayerTriggerHeld = false
+        mode = .off
+        shouldSwallowTriggerKeyUp = false
+        shouldEmitEscapeOnTriggerKeyUp = false
+        triggerKeyDownTimestamp = nil
+        return result
     }
 
     @discardableResult
     mutating func handleKeyEvent(keyCode: KeyCode, isKeyDown: Bool) -> Bool {
-        guard isGlobeKeyHeld else {
+        if keyCode == Self.numpadTriggerKeyCode {
+            isNumpadTriggerHeld = isKeyDown
+        }
+
+        guard isLayerTriggerHeld else {
             return false
+        }
+
+        if keyCode != Self.layerTriggerKeyCode, isKeyDown {
+            shouldEmitEscapeOnTriggerKeyUp = false
         }
 
         if isKeyDown, mode == .nav, keyCode == Self.numpadTriggerKeyCode {

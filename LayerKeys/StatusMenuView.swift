@@ -25,7 +25,7 @@ struct StatusMenuView: View {
                     .foregroundStyle(.secondary)
 
                 if !model.permissionState.isGranted {
-                    Button("Enable Input Monitoring") {
+                    Button("Enable Keyboard Permissions") {
                         model.requestPermission()
                     }
                 }
@@ -33,7 +33,7 @@ struct StatusMenuView: View {
 
             Divider()
 
-            Text("Hold Globe/Fn for navigation. Press A while holding Globe/Fn to switch into numpad until Globe/Fn is released.")
+            Text("Tap Escape normally. Hold Escape for navigation. Press A while holding Escape to switch into numpad until Escape is released.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 

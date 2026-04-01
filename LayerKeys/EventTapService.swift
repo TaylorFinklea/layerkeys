@@ -62,6 +62,8 @@ final class EventTapService {
 }
 
 private final class EventTapEngine: NSObject {
+    private static let syntheticEscapeEventTag: Int64 = 0x4C4B455343
+
     private let profileLock = NSLock()
     private var resolvedMappings: ResolvedMappings
     private var stateMachine = LayerStateMachine()
@@ -135,7 +137,6 @@ private final class EventTapEngine: NSObject {
         let eventMask =
             (1 << CGEventType.keyDown.rawValue)
             | (1 << CGEventType.keyUp.rawValue)
-            | (1 << CGEventType.flagsChanged.rawValue)
 
         let userInfo = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         guard let tapPort = CGEvent.tapCreate(
@@ -183,21 +184,31 @@ private final class EventTapEngine: NSObject {
                 CGEvent.tapEnable(tap: tapPort, enable: true)
             }
             return Unmanaged.passUnretained(event)
-        case .flagsChanged:
-            let fnHeld = event.flags.contains(.maskSecondaryFn)
-            let didChange = stateMachine.handleModifierChange(isGlobeKeyHeld: fnHeld)
-            if didChange {
-                onModeChange(stateMachine.mode)
+        case .keyDown, .keyUp:
+            if event.getIntegerValueField(.eventSourceUserData) == Self.syntheticEscapeEventTag {
+                return Unmanaged.passUnretained(event)
             }
 
             let keyCode = KeyCode(event.getIntegerValueField(.keyboardEventKeycode))
-            if keyCode == 0x3F {
+            let isKeyDown = type == .keyDown
+
+            if keyCode == LayerStateMachine.layerTriggerKeyCode {
+                if isKeyDown {
+                    let didChange = stateMachine.handleTriggerKeyDown(timestamp: event.timestamp)
+                    if didChange {
+                        onModeChange(stateMachine.mode)
+                    }
+                } else {
+                    let result = stateMachine.handleTriggerKeyUp(timestamp: event.timestamp)
+                    if result.modeDidChange {
+                        onModeChange(stateMachine.mode)
+                    }
+                    if result.shouldEmitEscape, PermissionController.hasPostEventAccess {
+                        postEscapeTap(flags: event.flags)
+                    }
+                }
                 return nil
             }
-            return Unmanaged.passUnretained(event)
-        case .keyDown, .keyUp:
-            let keyCode = KeyCode(event.getIntegerValueField(.keyboardEventKeycode))
-            let isKeyDown = type == .keyDown
 
             if stateMachine.handleKeyEvent(keyCode: keyCode, isKeyDown: isKeyDown) {
                 onModeChange(stateMachine.mode)
@@ -226,6 +237,26 @@ private final class EventTapEngine: NSObject {
             return Unmanaged.passRetained(event)
         default:
             return Unmanaged.passUnretained(event)
+        }
+    }
+
+    private func postEscapeTap(flags: CGEventFlags) {
+        guard let source = CGEventSource(stateID: .hidSystemState) else {
+            return
+        }
+
+        for isKeyDown in [true, false] {
+            guard let event = CGEvent(
+                keyboardEventSource: source,
+                virtualKey: LayerStateMachine.layerTriggerKeyCode,
+                keyDown: isKeyDown
+            ) else {
+                continue
+            }
+
+            event.flags = flags
+            event.setIntegerValueField(.eventSourceUserData, value: Self.syntheticEscapeEventTag)
+            event.post(tap: .cghidEventTap)
         }
     }
 }

@@ -24,7 +24,7 @@ struct SettingsView: View {
             Text("Layer Mappings")
                 .font(.title2.weight(.semibold))
 
-            Text("Triggers are fixed in v1: Globe/Fn activates navigation, and A switches from navigation to numpad while Globe/Fn remains held.")
+            Text("Triggers are fixed in v1: hold Escape for navigation, and press A while Escape remains held to switch from navigation to numpad.")
                 .foregroundStyle(.secondary)
 
             Form {
@@ -83,7 +83,7 @@ struct SettingsView: View {
             Text(model.permissionState.detail)
                 .foregroundStyle(.secondary)
 
-            Text("LayerKeys needs Input Monitoring so it can read keyboard events globally and rewrite them before they reach other apps.")
+            Text("LayerKeys needs Input Monitoring to read keyboard events globally. Accessibility is optional and only used to replay a normal Escape tap when you release the layer key without using a layer.")
                 .foregroundStyle(.secondary)
 
             HStack {
