@@ -132,22 +132,22 @@ enum NumpadTargetKey: String, CaseIterable, Codable, Hashable, Identifiable {
 
     var keyCode: KeyCode {
         switch self {
-        case .keypad0: return 0x1D
-        case .keypad1: return 0x12
-        case .keypad2: return 0x13
-        case .keypad3: return 0x14
-        case .keypad4: return 0x15
-        case .keypad5: return 0x17
-        case .keypad6: return 0x16
-        case .keypad7: return 0x1A
-        case .keypad8: return 0x1C
-        case .keypad9: return 0x19
-        case .keypadDecimal: return 0x2F
+        case .keypad0: return 0x52
+        case .keypad1: return 0x53
+        case .keypad2: return 0x54
+        case .keypad3: return 0x55
+        case .keypad4: return 0x56
+        case .keypad5: return 0x57
+        case .keypad6: return 0x58
+        case .keypad7: return 0x59
+        case .keypad8: return 0x5B
+        case .keypad9: return 0x5C
+        case .keypadDecimal: return 0x41
         }
     }
 
     var requiresNumericPadFlag: Bool {
-        false
+        true
     }
 }
 

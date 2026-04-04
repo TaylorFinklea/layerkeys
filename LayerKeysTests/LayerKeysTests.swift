@@ -86,8 +86,15 @@ final class LayerKeysTests: XCTestCase {
 
     func testNumericPadTargetsAreTagged() {
         let mappings = MappingProfile.default.resolvedMappings
-        XCTAssertFalse(mappings.targetRequiresNumericPadFlag(NumpadTargetKey.keypad7.keyCode))
+        XCTAssertTrue(mappings.targetRequiresNumericPadFlag(NumpadTargetKey.keypad7.keyCode))
         XCTAssertFalse(mappings.targetRequiresNumericPadFlag(NavigationTargetKey.leftArrow.keyCode))
+    }
+
+    func testNumpadTargetsUseKeypadKeyCodes() {
+        XCTAssertEqual(NumpadTargetKey.keypad4.keyCode, 0x56)
+        XCTAssertEqual(NumpadTargetKey.keypad5.keyCode, 0x57)
+        XCTAssertEqual(NumpadTargetKey.keypad6.keyCode, 0x58)
+        XCTAssertEqual(NumpadTargetKey.keypadDecimal.keyCode, 0x41)
     }
 
     func testDefaultNumpadProfileOnlyContainsNineDigitBindings() {
