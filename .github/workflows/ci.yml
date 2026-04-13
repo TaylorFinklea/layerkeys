@@ -1,0 +1,17 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: xcodebuild test -scheme LayerKeys -project LayerKeys.xcodeproj -destination 'platform=macOS'

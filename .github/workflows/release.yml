@@ -1,0 +1,38 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-release:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: xcodebuild test -scheme LayerKeys -project LayerKeys.xcodeproj -destination 'platform=macOS'
+
+      - name: Package release
+        run: ./scripts/package_release.sh
+
+      - id: package
+        name: Collect release metadata
+        run: |
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' LayerKeys/Info.plist)
+          SHA256=$(cat dist/LayerKeys.sha256)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/LayerKeys.zip
+          generate_release_notes: true
+          body: |
+            Homebrew cask sha256: `${{ steps.package.outputs.sha256 }}`
