@@ -33,7 +33,7 @@ struct StatusMenuView: View {
 
             Divider()
 
-            Text("Tap Escape normally. Hold Escape for navigation. Press A while holding Escape to switch into numpad until Escape is released.")
+            Text("Tap Control+Space for Escape. Hold Control+Space for navigation. Press A after the layer is active to switch into numpad until Space is released.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 

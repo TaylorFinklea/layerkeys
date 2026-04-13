@@ -194,17 +194,23 @@ private final class EventTapEngine: NSObject {
 
             if keyCode == LayerStateMachine.layerTriggerKeyCode {
                 if isKeyDown {
+                    guard event.flags.contains(LayerStateMachine.layerTriggerRequiredFlags) else {
+                        return Unmanaged.passUnretained(event)
+                    }
                     let didChange = stateMachine.handleTriggerKeyDown(timestamp: event.timestamp)
                     if didChange {
                         onModeChange(stateMachine.mode)
                     }
                 } else {
+                    guard stateMachine.isLayerTriggerHeld else {
+                        return Unmanaged.passUnretained(event)
+                    }
                     let result = stateMachine.handleTriggerKeyUp(timestamp: event.timestamp)
                     if result.modeDidChange {
                         onModeChange(stateMachine.mode)
                     }
                     if result.shouldEmitEscape, PermissionController.hasPostEventAccess {
-                        postEscapeTap(flags: event.flags)
+                        postEscapeTap(flags: outputFlags(for: event.flags))
                     }
                 }
                 return nil
@@ -224,9 +230,7 @@ private final class EventTapEngine: NSObject {
             }
 
             event.setIntegerValueField(.keyboardEventKeycode, value: Int64(remapped))
-
-            var flags = event.flags
-            flags.remove(.maskSecondaryFn)
+            var flags = outputFlags(for: event.flags)
             if mappings.targetRequiresNumericPadFlag(remapped) {
                 flags.insert(.maskNumericPad)
             } else {
@@ -248,7 +252,7 @@ private final class EventTapEngine: NSObject {
         for isKeyDown in [true, false] {
             guard let event = CGEvent(
                 keyboardEventSource: source,
-                virtualKey: LayerStateMachine.layerTriggerKeyCode,
+                virtualKey: LayerStateMachine.escapeKeyCode,
                 keyDown: isKeyDown
             ) else {
                 continue
@@ -258,6 +262,13 @@ private final class EventTapEngine: NSObject {
             event.setIntegerValueField(.eventSourceUserData, value: Self.syntheticEscapeEventTag)
             event.post(tap: .cghidEventTap)
         }
+    }
+
+    private func outputFlags(for originalFlags: CGEventFlags) -> CGEventFlags {
+        var flags = originalFlags
+        flags.remove(.maskSecondaryFn)
+        flags.remove(LayerStateMachine.layerTriggerRequiredFlags)
+        return flags
     }
 }
 

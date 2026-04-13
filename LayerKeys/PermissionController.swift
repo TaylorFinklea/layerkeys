@@ -24,9 +24,9 @@ enum InputMonitoringPermissionState: Equatable {
     var detail: String {
         switch self {
         case .granted:
-            return "LayerKeys can listen for Escape-held chords and post tap-Escape events globally."
+            return "LayerKeys can listen for Control+Space layer chords and post plain Escape taps globally."
         case .listenOnly:
-            return "LayerKeys can remap keys globally, but tap-Escape replay is disabled until Accessibility is also granted."
+            return "LayerKeys can remap keys globally, but Control+Space tap-to-Escape replay is disabled until Accessibility is also granted."
         case .denied:
             return "Grant Input Monitoring so LayerKeys can listen for global key events and apply remaps."
         }

@@ -9,12 +9,13 @@ struct TriggerKeyReleaseResult {
 struct LayerStateMachine {
     private(set) var mode: LayerMode = .off
     private(set) var isLayerTriggerHeld = false
-    private(set) var isNumpadTriggerHeld = false
     private(set) var shouldSwallowTriggerKeyUp = false
     private(set) var shouldEmitEscapeOnTriggerKeyUp = false
     private(set) var triggerKeyDownTimestamp: UInt64?
 
-    static let layerTriggerKeyCode: KeyCode = 0x35
+    static let escapeKeyCode: KeyCode = 0x35
+    static let layerTriggerKeyCode = InputKey.space.keyCode
+    static let layerTriggerRequiredFlags: CGEventFlags = .maskControl
     static let numpadTriggerKeyCode = InputKey.a.keyCode
     static let escapeTapThreshold: UInt64 = 200_000_000
 
@@ -26,13 +27,9 @@ struct LayerStateMachine {
 
         isLayerTriggerHeld = true
         triggerKeyDownTimestamp = timestamp
-        let nextMode: LayerMode = isNumpadTriggerHeld ? .numpad : .nav
-        shouldEmitEscapeOnTriggerKeyUp = nextMode == .nav
-        let didChange = mode != nextMode
-        mode = nextMode
-        if isNumpadTriggerHeld {
-            shouldSwallowTriggerKeyUp = true
-        }
+        shouldEmitEscapeOnTriggerKeyUp = true
+        let didChange = mode != .nav
+        mode = .nav
         return didChange
     }
 
@@ -64,10 +61,6 @@ struct LayerStateMachine {
 
     @discardableResult
     mutating func handleKeyEvent(keyCode: KeyCode, isKeyDown: Bool) -> Bool {
-        if keyCode == Self.numpadTriggerKeyCode {
-            isNumpadTriggerHeld = isKeyDown
-        }
-
         guard isLayerTriggerHeld else {
             return false
         }

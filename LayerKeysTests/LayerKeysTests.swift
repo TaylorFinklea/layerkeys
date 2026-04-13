@@ -4,7 +4,7 @@ import XCTest
 final class LayerKeysTests: XCTestCase {
     private let triggerDownTimestamp: UInt64 = 1_000_000_000
 
-    func testEscapeTriggerEntersNavigationMode() {
+    func testSpaceTriggerEntersNavigationMode() {
         var machine = LayerStateMachine()
 
         XCTAssertTrue(machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp))
@@ -27,20 +27,19 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertEqual(machine.mode, .off)
     }
 
-    func testHoldingAThenPressingEscapeStartsInNumpadMode() {
+    func testHoldingABeforeTriggerDoesNotStartInNumpadMode() {
         var machine = LayerStateMachine()
 
         XCTAssertFalse(machine.handleKeyEvent(keyCode: InputKey.a.keyCode, isKeyDown: true))
         XCTAssertTrue(machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp))
-        XCTAssertEqual(machine.mode, .numpad)
+        XCTAssertEqual(machine.mode, .nav)
 
-        XCTAssertTrue(machine.handleKeyEvent(keyCode: InputKey.a.keyCode, isKeyDown: false))
         let result = machine.handleTriggerKeyUp(timestamp: triggerDownTimestamp + 50_000_000)
-        XCTAssertFalse(result.shouldEmitEscape)
+        XCTAssertTrue(result.shouldEmitEscape)
         XCTAssertEqual(machine.mode, .off)
     }
 
-    func testTapEscapeEmitsEscapeOnTriggerRelease() {
+    func testTapTriggerEmitsEscapeOnTriggerRelease() {
         var machine = LayerStateMachine()
         _ = machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp)
 
@@ -50,7 +49,7 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertEqual(machine.mode, .off)
     }
 
-    func testHoldingEscapeDoesNotEmitEscapeOnRelease() {
+    func testHoldingTriggerDoesNotEmitEscapeOnRelease() {
         var machine = LayerStateMachine()
         _ = machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp)
 
