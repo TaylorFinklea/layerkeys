@@ -11,6 +11,7 @@
 		34E83C846C82F6FAC11BB7FB /* LayerStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5614FE7F13E329CC440DE8DF /* LayerStateMachine.swift */; };
 		5DC0AC793F07F52841EAB450 /* StatusMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76229598D365EFE526A32A9 /* StatusMenuView.swift */; };
 		746419AF0F3F284984BF6781 /* LayerKeysTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F997B2F6CB021160246F70D /* LayerKeysTests.swift */; };
+		889B2BEDC575E838FF768D3C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 98B1B1BB594D450EF5586F13 /* Assets.xcassets */; };
 		896A6D087F3E0381A12F625B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 970B16249206FEAA364B9A3E /* SettingsView.swift */; };
 		8976B90D597DF989111D20FE /* LayerKeysApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70D9F48A8E428361E238D4F /* LayerKeysApp.swift */; };
 		930D17BCE17BA9FCB5C5FAD9 /* PermissionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02E6DF627BC5BCBB88A78F3 /* PermissionController.swift */; };
@@ -35,6 +36,7 @@
 		2AB865736648036CD032AF79 /* MappingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MappingStore.swift; sourceTree = "<group>"; };
 		5614FE7F13E329CC440DE8DF /* LayerStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerStateMachine.swift; sourceTree = "<group>"; };
 		970B16249206FEAA364B9A3E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		98B1B1BB594D450EF5586F13 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9F997B2F6CB021160246F70D /* LayerKeysTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerKeysTests.swift; sourceTree = "<group>"; };
 		9FB17AD1847696A89A02AD51 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A02E6DF627BC5BCBB88A78F3 /* PermissionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionController.swift; sourceTree = "<group>"; };
@@ -59,6 +61,7 @@
 			isa = PBXGroup;
 			children = (
 				CBA671C6F3440AED4672E87C /* AppModel.swift */,
+				98B1B1BB594D450EF5586F13 /* Assets.xcassets */,
 				28F868D39D50E8E4FAF987FA /* EventTapService.swift */,
 				9FB17AD1847696A89A02AD51 /* Info.plist */,
 				1A5094C6125946F2A77371D9 /* KeyCatalog.swift */,
@@ -97,6 +100,7 @@
 			buildConfigurationList = 37A1311517F3C90852EAB6B2 /* Build configuration list for PBXNativeTarget "LayerKeys" */;
 			buildPhases = (
 				D257699A1E7E0569D1ABA50D /* Sources */,
+				C0AC64A457F3F292F3B7493D /* Resources */,
 			);
 			buildRules = (
 			);
@@ -160,6 +164,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C0AC64A457F3F292F3B7493D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				889B2BEDC575E838FF768D3C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		03AABF48307A38D81889DCD4 /* Sources */ = {
