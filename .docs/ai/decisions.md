@@ -120,6 +120,51 @@ entering form data, navigating between fields and typing numbers). The
 behavior is documented in the constraints section of `roadmap.md` so it
 doesn't get accidentally changed.
 
+## [2026-04-19] Function keys dropped from M1 source-key catalog
+
+**Context**: The original M1 roadmap listed `Add F1–F12 function keys to
+InputKey` alongside digits, punctuation, and the ISO section key. When
+actually planning M1, the purpose of F-keys as *source* keys came into
+question.
+
+**Decision**: Drop F1–F19 from the M1 source-key catalog. Expose digits,
+`[ ] ' ` `` ` `` `-` `=` `\`, and `§` only. Function keys are not added as
+sources — not now, not later.
+
+**Alternatives considered**:
+- Include F1–F12 for completeness.
+- Include F1–F19 so everything is covered at once.
+- Defer function keys to a later milestone as sources.
+
+**Rationale**: `InputKey` is the *source* side of a layer binding — the
+key you press while holding the trigger chord. Binding F-keys as sources
+fights the product's "home-row, done right" thesis: if a user is reaching
+for F13, they've already left the home row and could just bind the F-key
+directly in macOS. Function keys have real value as *targets* (hold the
+trigger, press `H` to emit `F5` for an app shortcut) but that expands
+`NavigationTargetKey` / `NumpadTargetKey`, not `InputKey`, and is a
+separate product conversation worth having only if real users ask for it.
+Keeping the source catalog disciplined to the typing cluster preserves
+the minimalist identity.
+
+**Follow-up**: Re-open this decision only if users explicitly request
+function keys as targets. Pure curiosity isn't enough.
+
+## [2026-04-19] Space lives in the `.punctuation` Category (labeled "Punctuation & Space")
+
+**Context**: When grouping `InputKey` into `.letters` / `.digits` /
+`.punctuation` / `.iso` for the new sectioned Settings picker, `.space`
+needed a home. Options: a single-member `.space` category, include in
+`.punctuation`, or include in `.letters` (no).
+
+**Decision**: Put `.space` in `.punctuation`; label the section
+"Punctuation & Space" so the picker is self-explanatory.
+
+**Rationale**: A one-item section is worse UX than a slightly broader
+label, and `.space` is structurally the only other "non-letter typing
+cluster" key. This avoids both a lonely section and an unlabeled
+mystery-bucket.
+
 ## [2026-04-18] Backlog `tier3_owner: claude`
 
 **Context**: The shared workflow lets repos pick which agent owns Opus-tier

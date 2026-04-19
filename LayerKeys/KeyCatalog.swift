@@ -6,26 +6,86 @@ typealias KeyCode = CGKeyCode
 enum InputKey: String, CaseIterable, Codable, Hashable, Identifiable {
     case a, b, c, d, e, f, g, h, i, j, k, l, m
     case n, o, p, q, r, s, t, u, v, w, x, y, z
+
+    case one, two, three, four, five, six, seven, eight, nine, zero
+
+    case grave
+    case minus
+    case equal
+    case leftBracket
+    case rightBracket
+    case backslash
     case semicolon
+    case quote
     case comma
     case period
     case slash
     case space
 
+    case sectionKey
+
     var id: String { rawValue }
+
+    enum Category: CaseIterable {
+        case letters
+        case digits
+        case punctuation
+        case iso
+
+        var title: String {
+            switch self {
+            case .letters: return "Letters"
+            case .digits: return "Digits"
+            case .punctuation: return "Punctuation & Space"
+            case .iso: return "ISO"
+            }
+        }
+    }
+
+    var category: Category {
+        switch self {
+        case .a, .b, .c, .d, .e, .f, .g, .h, .i, .j, .k, .l, .m,
+             .n, .o, .p, .q, .r, .s, .t, .u, .v, .w, .x, .y, .z:
+            return .letters
+        case .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .zero:
+            return .digits
+        case .grave, .minus, .equal, .leftBracket, .rightBracket, .backslash,
+             .semicolon, .quote, .comma, .period, .slash, .space:
+            return .punctuation
+        case .sectionKey:
+            return .iso
+        }
+    }
+
+    static func cases(in category: Category) -> [InputKey] {
+        allCases.filter { $0.category == category }
+    }
 
     var title: String {
         switch self {
-        case .semicolon:
-            return ";"
-        case .comma:
-            return ","
-        case .period:
-            return "."
-        case .slash:
-            return "/"
-        case .space:
-            return "Space"
+        case .semicolon: return ";"
+        case .quote: return "'"
+        case .comma: return ","
+        case .period: return "."
+        case .slash: return "/"
+        case .space: return "Space"
+        case .grave: return "`"
+        case .minus: return "-"
+        case .equal: return "="
+        case .leftBracket: return "["
+        case .rightBracket: return "]"
+        case .backslash: return "\\"
+        case .one: return "1"
+        case .two: return "2"
+        case .three: return "3"
+        case .four: return "4"
+        case .five: return "5"
+        case .six: return "6"
+        case .seven: return "7"
+        case .eight: return "8"
+        case .nine: return "9"
+        case .zero: return "0"
+        case .sectionKey: return "§"
         default:
             return rawValue.uppercased()
         }
@@ -59,11 +119,29 @@ enum InputKey: String, CaseIterable, Codable, Hashable, Identifiable {
         case .x: return 0x07
         case .y: return 0x10
         case .z: return 0x06
+        case .one: return 0x12
+        case .two: return 0x13
+        case .three: return 0x14
+        case .four: return 0x15
+        case .five: return 0x17
+        case .six: return 0x16
+        case .seven: return 0x1A
+        case .eight: return 0x1C
+        case .nine: return 0x19
+        case .zero: return 0x1D
+        case .grave: return 0x32
+        case .minus: return 0x1B
+        case .equal: return 0x18
+        case .leftBracket: return 0x21
+        case .rightBracket: return 0x1E
+        case .backslash: return 0x2A
         case .semicolon: return 0x29
+        case .quote: return 0x27
         case .comma: return 0x2B
         case .period: return 0x2F
         case .slash: return 0x2C
         case .space: return 0x31
+        case .sectionKey: return 0x0A
         }
     }
 }

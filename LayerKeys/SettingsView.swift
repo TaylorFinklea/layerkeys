@@ -115,8 +115,12 @@ private struct NavigationBindingRow: View {
     var body: some View {
         HStack {
             Picker("From", selection: $binding.source) {
-                ForEach(InputKey.allCases) { key in
-                    Text(key.title).tag(key)
+                ForEach(InputKey.Category.allCases, id: \.self) { category in
+                    Section(category.title) {
+                        ForEach(InputKey.cases(in: category)) { key in
+                            Text(key.title).tag(key)
+                        }
+                    }
                 }
             }
             .labelsHidden()
@@ -157,8 +161,12 @@ private struct NumpadBindingRow: View {
     var body: some View {
         HStack {
             Picker("From", selection: $binding.source) {
-                ForEach(InputKey.allCases) { key in
-                    Text(key.title).tag(key)
+                ForEach(InputKey.Category.allCases, id: \.self) { category in
+                    Section(category.title) {
+                        ForEach(InputKey.cases(in: category)) { key in
+                            Text(key.title).tag(key)
+                        }
+                    }
                 }
             }
             .labelsHidden()

@@ -18,17 +18,20 @@ reliability, and zero-friction install are the long-term differentiators.
 Sequenced capability-first, polish last. Each milestone closes when every box
 is checked and the verification command passes.
 
-### M1: Source-key catalog expansion
+### M1: Source-key catalog expansion ✅
 
 Today only `a–z`, `; , . / Space` can act as layer source keys. M1 widens the
 catalog so users can bind layer mappings onto more of their keyboard.
+Function keys are **not** added — they fight the "home-row-only" product
+thesis and, if they matter later, belong on the target side of the catalog
+(see `decisions.md` 2026-04-19 entry).
 
-- [ ] Add digits `1–0` to `InputKey` (LayerKeys/KeyCatalog.swift) — verified by `xcodebuild test` and a new `testInputKeyKeycodesCoverDigits` assertion against known macOS keycodes.
-- [ ] Add bracket / quote / hyphen / equal / backtick / backslash punctuation (`[ ] ' ` `` ` `` `-` `=` `\`) to `InputKey` — verified by a parameterized test asserting each maps to the correct `CGKeyCode` constant.
-- [ ] Add F1–F12 function keys to `InputKey` — verified by a test plus a manual smoke-test in Settings (binding `F5 → ↓` works end-to-end).
-- [ ] Add the ISO `§/±` key (keycode 0x0A) so non-US keyboards have one extra source — verified by test; behind no special UI gating.
-- [ ] Settings pickers (`SettingsView.swift`) sort and group the expanded catalog (Letters / Digits / Punctuation / Function) so the source pickers don't become an unreadable wall — verified visually in the running app.
-- [ ] Default `MappingProfile.default` is unchanged — verified by `testDefaultNumpadProfileOnlyContainsNineDigitBindings`.
+- [x] Add digits `1–0` to `InputKey` (LayerKeys/KeyCatalog.swift) — verified by `testInputKeyDigitKeycodes` asserting each against its `kVK_ANSI_*` keycode.
+- [x] Add bracket / quote / hyphen / equal / backtick / backslash punctuation (`[ ] ' ` `` ` `` `-` `=` `\`) to `InputKey` — verified by `testInputKeyPunctuationKeycodes`.
+- [x] Add the ISO `§/±` key (keycode 0x0A) so non-US keyboards have one extra source — verified by `testInputKeyISOSectionKeycode`.
+- [x] Add `InputKey.Category` (`.letters` / `.digits` / `.punctuation` / `.iso`) plus `cases(in:)` helper, and group the Settings `From` picker by section so the 49-case list is navigable — verified visually in the running app and by `testInputKeyCategoryGrouping`.
+- [x] Default `MappingProfile.default` is unchanged — verified by `testDefaultNumpadProfileOnlyContainsNineDigitBindings` still passing.
+- [x] Stored pre-M1 profiles continue to decode — verified by `testLegacyStoredDefaultMigratesToCurrentDefault` still passing (reordering existing cases is safe because `rawValue` is derived from case names).
 
 ### M2: Configurable trigger
 

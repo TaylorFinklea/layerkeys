@@ -130,4 +130,62 @@ final class LayerKeysTests: XCTestCase {
 
         defaults.removePersistentDomain(forName: suiteName)
     }
+
+    func testInputKeyDigitKeycodes() {
+        XCTAssertEqual(InputKey.one.keyCode, 0x12)
+        XCTAssertEqual(InputKey.two.keyCode, 0x13)
+        XCTAssertEqual(InputKey.three.keyCode, 0x14)
+        XCTAssertEqual(InputKey.four.keyCode, 0x15)
+        XCTAssertEqual(InputKey.five.keyCode, 0x17)
+        XCTAssertEqual(InputKey.six.keyCode, 0x16)
+        XCTAssertEqual(InputKey.seven.keyCode, 0x1A)
+        XCTAssertEqual(InputKey.eight.keyCode, 0x1C)
+        XCTAssertEqual(InputKey.nine.keyCode, 0x19)
+        XCTAssertEqual(InputKey.zero.keyCode, 0x1D)
+    }
+
+    func testInputKeyPunctuationKeycodes() {
+        XCTAssertEqual(InputKey.grave.keyCode, 0x32)
+        XCTAssertEqual(InputKey.minus.keyCode, 0x1B)
+        XCTAssertEqual(InputKey.equal.keyCode, 0x18)
+        XCTAssertEqual(InputKey.leftBracket.keyCode, 0x21)
+        XCTAssertEqual(InputKey.rightBracket.keyCode, 0x1E)
+        XCTAssertEqual(InputKey.backslash.keyCode, 0x2A)
+        XCTAssertEqual(InputKey.quote.keyCode, 0x27)
+        XCTAssertEqual(InputKey.semicolon.keyCode, 0x29)
+    }
+
+    func testInputKeyISOSectionKeycode() {
+        XCTAssertEqual(InputKey.sectionKey.keyCode, 0x0A)
+    }
+
+    func testInputKeyAllCasesContainsEveryExpectedCase() {
+        let expected: Set<InputKey> = [
+            .a, .b, .c, .d, .e, .f, .g, .h, .i, .j, .k, .l, .m,
+            .n, .o, .p, .q, .r, .s, .t, .u, .v, .w, .x, .y, .z,
+            .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .zero,
+            .grave, .minus, .equal, .leftBracket, .rightBracket, .backslash,
+            .semicolon, .quote, .comma, .period, .slash, .space,
+            .sectionKey,
+        ]
+        XCTAssertEqual(Set(InputKey.allCases), expected)
+        XCTAssertEqual(InputKey.allCases.count, 49)
+    }
+
+    func testInputKeyCategoryGrouping() {
+        XCTAssertEqual(InputKey.cases(in: .letters).count, 26)
+        XCTAssertEqual(InputKey.cases(in: .digits).count, 10)
+        XCTAssertEqual(InputKey.cases(in: .punctuation).count, 12)
+        XCTAssertEqual(InputKey.cases(in: .iso).count, 1)
+
+        let totalInCategories = InputKey.Category.allCases
+            .reduce(0) { $0 + InputKey.cases(in: $1).count }
+        XCTAssertEqual(totalInCategories, InputKey.allCases.count)
+
+        XCTAssertEqual(InputKey.a.category, .letters)
+        XCTAssertEqual(InputKey.five.category, .digits)
+        XCTAssertEqual(InputKey.space.category, .punctuation)
+        XCTAssertEqual(InputKey.leftBracket.category, .punctuation)
+        XCTAssertEqual(InputKey.sectionKey.category, .iso)
+    }
 }
