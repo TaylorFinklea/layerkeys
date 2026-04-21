@@ -6,6 +6,19 @@ struct TriggerKeyReleaseResult {
     let shouldEmitEscape: Bool
 }
 
+enum EventAction: Equatable {
+    case passThrough
+    case consume
+    case enterLayerTrigger
+    case exitLayerTrigger(emitEscape: Bool)
+    case remap(keyCode: KeyCode, setNumericPadFlag: Bool)
+}
+
+struct EventDecision: Equatable {
+    let action: EventAction
+    let modeDidChange: Bool
+}
+
 struct LayerStateMachine {
     private(set) var mode: LayerMode = .off
     private(set) var isLayerTriggerHeld = false
@@ -32,6 +45,19 @@ struct LayerStateMachine {
 
     var numpadTriggerKeyCode: KeyCode {
         triggers.numpadSubTrigger.keyCode
+    }
+
+    /// Sanitizes an incoming event's modifier flags before we forward or replay
+    /// it: always drop `.maskSecondaryFn` (Fn was only present to generate the
+    /// arrow/keypad keycode in the first place) and drop the user's trigger
+    /// modifier set (so downstream apps don't see a ghost `Control` / `Command`
+    /// chord). Caller is responsible for adding or removing `.maskNumericPad`
+    /// per target.
+    func outputFlags(for originalFlags: CGEventFlags) -> CGEventFlags {
+        var flags = originalFlags
+        flags.remove(.maskSecondaryFn)
+        flags.remove(layerTriggerRequiredFlags)
+        return flags
     }
 
     @discardableResult
@@ -96,5 +122,62 @@ struct LayerStateMachine {
         }
 
         return false
+    }
+
+    /// Pure decision function over a single key event. All state mutation
+    /// happens here; the caller is responsible for applying the returned
+    /// action to the underlying `CGEvent` (or a test double).
+    mutating func decide(
+        eventType: CGEventType,
+        keyCode: KeyCode,
+        currentFlags: CGEventFlags,
+        isSyntheticEscape: Bool,
+        timestamp: UInt64,
+        mappings: ResolvedMappings
+    ) -> EventDecision {
+        guard eventType == .keyDown || eventType == .keyUp else {
+            return EventDecision(action: .passThrough, modeDidChange: false)
+        }
+
+        if isSyntheticEscape {
+            return EventDecision(action: .passThrough, modeDidChange: false)
+        }
+
+        let isKeyDown = eventType == .keyDown
+
+        if keyCode == layerTriggerKeyCode {
+            if isKeyDown {
+                guard currentFlags.contains(layerTriggerRequiredFlags) else {
+                    return EventDecision(action: .passThrough, modeDidChange: false)
+                }
+                let didChange = handleTriggerKeyDown(timestamp: timestamp)
+                return EventDecision(action: .enterLayerTrigger, modeDidChange: didChange)
+            } else {
+                guard isLayerTriggerHeld else {
+                    return EventDecision(action: .passThrough, modeDidChange: false)
+                }
+                let result = handleTriggerKeyUp(timestamp: timestamp)
+                return EventDecision(
+                    action: .exitLayerTrigger(emitEscape: result.shouldEmitEscape),
+                    modeDidChange: result.modeDidChange
+                )
+            }
+        }
+
+        if handleKeyEvent(keyCode: keyCode, isKeyDown: isKeyDown) {
+            return EventDecision(action: .consume, modeDidChange: true)
+        }
+
+        guard let remapped = mappings.remappedKeyCode(for: keyCode, mode: mode) else {
+            return EventDecision(action: .passThrough, modeDidChange: false)
+        }
+
+        return EventDecision(
+            action: .remap(
+                keyCode: remapped,
+                setNumericPadFlag: mappings.targetRequiresNumericPadFlag(remapped)
+            ),
+            modeDidChange: false
+        )
     }
 }

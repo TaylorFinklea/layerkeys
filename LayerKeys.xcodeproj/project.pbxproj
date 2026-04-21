@@ -11,6 +11,7 @@
 		34E83C846C82F6FAC11BB7FB /* LayerStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5614FE7F13E329CC440DE8DF /* LayerStateMachine.swift */; };
 		5DC0AC793F07F52841EAB450 /* StatusMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76229598D365EFE526A32A9 /* StatusMenuView.swift */; };
 		746419AF0F3F284984BF6781 /* LayerKeysTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F997B2F6CB021160246F70D /* LayerKeysTests.swift */; };
+		7A1D889E00F8B1DB8F89D32E /* EventTapEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 287902CDB6361EEDA6B8F0EA /* EventTapEngine.swift */; };
 		889B2BEDC575E838FF768D3C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 98B1B1BB594D450EF5586F13 /* Assets.xcassets */; };
 		896A6D087F3E0381A12F625B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 970B16249206FEAA364B9A3E /* SettingsView.swift */; };
 		8976B90D597DF989111D20FE /* LayerKeysApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70D9F48A8E428361E238D4F /* LayerKeysApp.swift */; };
@@ -32,6 +33,7 @@
 
 /* Begin PBXFileReference section */
 		1A5094C6125946F2A77371D9 /* KeyCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyCatalog.swift; sourceTree = "<group>"; };
+		287902CDB6361EEDA6B8F0EA /* EventTapEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTapEngine.swift; sourceTree = "<group>"; };
 		28F868D39D50E8E4FAF987FA /* EventTapService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTapService.swift; sourceTree = "<group>"; };
 		2AB865736648036CD032AF79 /* MappingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MappingStore.swift; sourceTree = "<group>"; };
 		5614FE7F13E329CC440DE8DF /* LayerStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerStateMachine.swift; sourceTree = "<group>"; };
@@ -62,6 +64,7 @@
 			children = (
 				CBA671C6F3440AED4672E87C /* AppModel.swift */,
 				98B1B1BB594D450EF5586F13 /* Assets.xcassets */,
+				287902CDB6361EEDA6B8F0EA /* EventTapEngine.swift */,
 				28F868D39D50E8E4FAF987FA /* EventTapService.swift */,
 				9FB17AD1847696A89A02AD51 /* Info.plist */,
 				1A5094C6125946F2A77371D9 /* KeyCatalog.swift */,
@@ -190,6 +193,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FBF226D0040E61B2336C8C35 /* AppModel.swift in Sources */,
+				7A1D889E00F8B1DB8F89D32E /* EventTapEngine.swift in Sources */,
 				CEFC4EC00C8808F00AE7CC98 /* EventTapService.swift in Sources */,
 				2B6B17E4697DFDCEA1DF7BC8 /* KeyCatalog.swift in Sources */,
 				8976B90D597DF989111D20FE /* LayerKeysApp.swift in Sources */,

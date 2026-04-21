@@ -48,15 +48,18 @@ M1's home-row identity; see `decisions.md` 2026-04-20).
 - [x] Tap-to-Escape is a user toggle (default on); state machine reads `tapToEscapeEnabled` — verified by `testTapToEscapeDisabledViaTriggerProfile`.
 - [x] README + Settings + StatusMenu copy updated; the "Triggers are fixed in v1" string is gone; the status-menu instruction text is now derived from the live trigger profile.
 
-### M3: Reliability & correctness pass
+### M3: Reliability & correctness pass ✅
 
-Make the tap survive every weird thing macOS throws at it.
+Make the tap survive every weird thing macOS throws at it. Non-US
+keyboard-layout glyph labels were **deferred** (scope-creep: they need
+Carbon/TIS glue and are a UI refinement, not a reliability fix — folded
+into M4 polish; see `decisions.md` 2026-04-20 entry).
 
-- [ ] Tap re-enables itself on `tapDisabledByTimeout` *and* `tapDisabledByUserInput` (already partial) and recovers after wake from sleep / display-lock — verified by a manual sleep/wake smoke test plus a new test driving the engine's tap-disabled handler.
-- [ ] Audit `EventTapEngine.handle` for `Unmanaged` / retain edge cases (the synthetic-escape tag check, returning `nil` vs `passUnretained` vs `passRetained`) — verified by code review notes captured in the phase report.
-- [ ] Add a unit-testable seam for `EventTapEngine.handle` (e.g. inject a `CGEvent` factory or split into pure mapping + side-effect halves) so we can test the keypad-flag path and synthetic-escape suppression without a real CGEventTap — verified by new tests.
-- [ ] Non-US layout sanity check: physical keycodes are layout-independent, but Settings labels currently assume US glyphs (`;`, `,`, `.`, `/`). Show the user's layout-localized glyph next to the rawValue label — verified visually on a non-US keyboard layout in System Settings.
-- [ ] CapsLock state during a hold doesn't break tap-to-Escape replay — verified by a new test that injects `.maskAlphaShift` into the trigger-up flags.
+- [x] Tap re-enables on `tapDisabledByTimeout` / `tapDisabledByUserInput` (engine-thread `reEnableTapOnThread()`) and recovers on `NSWorkspace.didWakeNotification` via `SleepWakeHandler` (falls back to `stop()` + `start()` if `CGEvent.tapIsEnabled` returns false after re-enable) — verified by 4 new `testSleepWake*` tests covering both happy path and "tap died during sleep" fallback.
+- [x] `Unmanaged` / retention audit — after the seam refactor there is exactly one `Unmanaged.passRetained(event)` site (the `.remap` branch of `handle`), one mutation path, and the ownership contract is obvious. Findings captured in `current-state.md` 2026-04-20.
+- [x] Testable seam on `EventTapEngine.handle` — extracted a pure `LayerStateMachine.decide(...)` returning `EventDecision(action: EventAction, modeDidChange: Bool)`. The engine now dispatches the action to CGEvent side effects. 10 new `testDecide*` tests cover synthetic-escape suppression, trigger chord entry, wrong-modifier rejection, quick-tap Escape, tap-to-Escape toggle off, nav-remap, numpad-remap, sub-trigger consume, no-layer pass-through, and unrelated event-type pass-through.
+- [x] CapsLock state during hold doesn't break tap-to-Escape — verified by `testCapsLockDuringHoldDoesNotSuppressTapToEscape` plus 4 `testOutputFlags*` hygiene tests asserting the trigger modifier set is stripped, `.maskSecondaryFn` is always stripped, and non-trigger modifiers (`.maskShift`, `.maskAlphaShift`) pass through untouched.
+- [x] **Pre-M3 warmup**: extracted `EventTapEngine` + `EventTapStartup` (and the new `TapLivenessProbe`) from `EventTapService.swift` into `LayerKeys/EventTapEngine.swift`. Sonnet-tier backlog item `[x]`.
 
 ### M4: Notarized v1.0 — onboarding, launch-at-login, polish
 
@@ -91,11 +94,11 @@ session by an agent of the appropriate tier. Run `/audit-backlog` to refill.
 
 - [x] `LayerKeys/SettingsView.swift` — unified `NavigationBindingRow` and `NumpadBindingRow` into a single generic `BindingRow<Model: LayerBindingModel>` with fileprivate `LayerTargetKey` / `LayerBindingModel` protocols (done 2026-04-20 as a pre-M2 warmup; verified by `xcodebuild test` 16/16).
 - [ ] `LayerKeys/AppModel.swift:93-137` — the six `add/remove/update` binding methods duplicate logic across `navigation` and `numpad`. Extract a generic over a `WritableKeyPath` to `[Binding]` so the methods become two-line wrappers.
-- [ ] `LayerKeys/EventTapService.swift:64+` — the private `EventTapEngine` is ~210 lines and arguably the heart of the app; move it into its own `EventTapEngine.swift` file (still `internal`) so the service-vs-engine split is obvious from the project navigator.
+- [x] `LayerKeys/EventTapEngine.swift` — `EventTapEngine` + `EventTapStartup` extracted into their own file; `EventTapService.swift` now hosts only the service facade + `SleepWakeHandler` (done 2026-04-20 as pre-M3 warmup).
 
 ### Opus (design skill, cross-cutting — owned by `tier3_owner`)
 
-- [ ] Add a unit-testable seam to `EventTapEngine.handle` so the synthetic-escape tag round-trip and the `.maskNumericPad` flag transitions can be tested without a real CGEventTap (likely a `CGEvent`-factory injection or a pure `EventDecision` value returned from a separate function).
+- [x] Unit-testable seam on `EventTapEngine.handle` — done 2026-04-20 as M3.1. Pure `LayerStateMachine.decide(...)` returns `EventDecision(action:modeDidChange:)`; 10 new `testDecide*` tests cover synthetic-escape suppression, keypad-flag round-trip, and every action branch.
 - [ ] Investigate replacing the raw `Thread` + `CFRunLoop` in `EventTapEngine` with a `DispatchQueue`-driven CFRunLoop or a Swift actor wrapper, *only if* it doesn't regress latency. Capture findings even if we keep the current shape.
 
 ## Priority Order

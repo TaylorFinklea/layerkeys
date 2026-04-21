@@ -217,6 +217,56 @@ handles the forward-compatibility case (future non-breaking additions
 need only another `decodeIfPresent`). Schema versioning would be
 premature; we don't have a migration chain worth organizing yet.
 
+## [2026-04-20] Non-US keyboard-layout glyph labels deferred out of M3
+
+**Context**: M3 was originally scoped to include a "non-US layout sanity
+check" — translate each `InputKey`'s title to the user's current
+keyboard-layout glyph via `TISCopyCurrentKeyboardInputSource` +
+`UCKeyTranslate`, and refresh on
+`kTISNotifySelectedKeyboardInputSourceChanged`.
+
+**Decision**: Defer. M3 ships with English-only labels. Keycodes are
+already layout-independent (physical scancodes), so functionality works
+on non-US layouts; only the label text is US-centric. Revisit during M4's
+polish pass, or when a real non-US user files an issue.
+
+**Alternatives considered**:
+- Minimal version: show `"semicolon (ö)"` on German layouts in the picker.
+- Full version: replace the English label entirely and observe input-source
+  changes live.
+
+**Rationale**: Carbon/TIS glue is significant surface area for a UI
+refinement with no reliability value. M3's charter is "make the tap
+survive everything macOS throws at it" — localization doesn't fit. The
+code change is entirely additive when we do it; nothing locked in M3
+precludes the later work.
+
+## [2026-04-20] M3 testable seam via pure `decide()` value, not a CGEvent protocol
+
+**Context**: `EventTapEngine.handle` had zero test coverage because it
+interleaved `CGEvent` side effects (mutating keycode / flags, calling
+`CGEvent.tapEnable`, posting synthetic events) with pure state-machine
+logic. Opus-tier backlog item called for a unit-testable seam. Two
+shapes were on the table: (a) extract a pure `EventAction` value that
+the state machine returns, or (b) wrap `CGEvent` in a protocol so the
+engine becomes parameterized over a test double.
+
+**Decision**: Shape (a) — pure `EventAction` enum with a
+`LayerStateMachine.decide(...)` method. Engine becomes a thin
+CGEvent-side-effect switch over the action.
+
+**Alternatives considered**: CGEvent protocol wrapper (rejected —
+larger surface area, more ceremony, doesn't actually test more logic).
+
+**Rationale**: The interesting branches are all in the decision
+(which action to take), not in the side effects (how to apply it).
+Testing the decision with plain values + explicit `CGEventFlags` bit
+sets is cheaper and more precise than mocking a whole CGEvent.
+Matches the existing test style (`LayerStateMachine` tests use
+concrete keycode values, not mocks). Side-effect paths stay small
+enough to eyeball; the `Unmanaged.passRetained` contract collapsed to
+a single `.remap` branch as a bonus.
+
 ## [2026-04-18] Backlog `tier3_owner: claude`
 
 **Context**: The shared workflow lets repos pick which agent owns Opus-tier

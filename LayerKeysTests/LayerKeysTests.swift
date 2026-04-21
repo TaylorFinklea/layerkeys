@@ -351,4 +351,337 @@ final class LayerKeysTests: XCTestCase {
         // Modifiers rendered in the stable allCases order (command, control, option, shift).
         XCTAssertEqual(triggers.chordSummary, "\u{2303}\u{2325}Space")
     }
+
+    // MARK: - M3 decide() seam
+
+    private func defaultMappings() -> ResolvedMappings {
+        MappingProfile.default.resolvedMappings
+    }
+
+    func testDecidePassesThroughSyntheticEscape() {
+        var machine = LayerStateMachine()
+        let decision = machine.decide(
+            eventType: .keyDown,
+            keyCode: LayerStateMachine.escapeKeyCode,
+            currentFlags: [],
+            isSyntheticEscape: true,
+            timestamp: triggerDownTimestamp,
+            mappings: defaultMappings()
+        )
+        XCTAssertEqual(decision, EventDecision(action: .passThrough, modeDidChange: false))
+        XCTAssertFalse(machine.isLayerTriggerHeld)
+    }
+
+    func testDecidePassesThroughUnrelatedEventTypes() {
+        var machine = LayerStateMachine()
+        let decision = machine.decide(
+            eventType: .mouseMoved,
+            keyCode: 0,
+            currentFlags: [],
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp,
+            mappings: defaultMappings()
+        )
+        XCTAssertEqual(decision.action, .passThrough)
+    }
+
+    func testDecideEntersLayerOnValidTriggerChord() {
+        var machine = LayerStateMachine()
+        let decision = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.space.keyCode,
+            currentFlags: .maskControl,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp,
+            mappings: defaultMappings()
+        )
+        XCTAssertEqual(decision, EventDecision(action: .enterLayerTrigger, modeDidChange: true))
+        XCTAssertEqual(machine.mode, .nav)
+    }
+
+    func testDecideRejectsTriggerWithWrongModifiers() {
+        var machine = LayerStateMachine()
+        let decision = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.space.keyCode,
+            currentFlags: .maskAlternate,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp,
+            mappings: defaultMappings()
+        )
+        XCTAssertEqual(decision.action, .passThrough)
+        XCTAssertFalse(machine.isLayerTriggerHeld)
+    }
+
+    func testDecideEmitsEscapeOnQuickTriggerRelease() {
+        var machine = LayerStateMachine()
+        _ = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.space.keyCode,
+            currentFlags: .maskControl,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp,
+            mappings: defaultMappings()
+        )
+        let release = machine.decide(
+            eventType: .keyUp,
+            keyCode: InputKey.space.keyCode,
+            currentFlags: .maskControl,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp + 50_000_000,
+            mappings: defaultMappings()
+        )
+        XCTAssertEqual(release.action, .exitLayerTrigger(emitEscape: true))
+        XCTAssertTrue(release.modeDidChange)
+        XCTAssertEqual(machine.mode, .off)
+    }
+
+    func testDecideSkipsEscapeWhenTapToEscapeDisabled() {
+        let triggers = TriggerProfile(
+            layerKey: .space,
+            layerModifiers: [.control],
+            numpadSubTrigger: .a,
+            tapToEscapeEnabled: false
+        )
+        var machine = LayerStateMachine(triggers: triggers)
+        _ = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.space.keyCode,
+            currentFlags: .maskControl,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp,
+            mappings: defaultMappings()
+        )
+        let release = machine.decide(
+            eventType: .keyUp,
+            keyCode: InputKey.space.keyCode,
+            currentFlags: .maskControl,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp + 50_000_000,
+            mappings: defaultMappings()
+        )
+        XCTAssertEqual(release.action, .exitLayerTrigger(emitEscape: false))
+    }
+
+    func testDecideRemapsNavTargetWithoutNumericPadFlag() {
+        var machine = LayerStateMachine()
+        _ = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.space.keyCode,
+            currentFlags: .maskControl,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp,
+            mappings: defaultMappings()
+        )
+        let decision = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.h.keyCode,
+            currentFlags: .maskControl,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp + 10_000_000,
+            mappings: defaultMappings()
+        )
+        XCTAssertEqual(
+            decision.action,
+            .remap(keyCode: NavigationTargetKey.leftArrow.keyCode, setNumericPadFlag: false)
+        )
+    }
+
+    func testDecideRemapsNumpadTargetWithNumericPadFlag() {
+        var machine = LayerStateMachine()
+        _ = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.space.keyCode,
+            currentFlags: .maskControl,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp,
+            mappings: defaultMappings()
+        )
+        _ = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.a.keyCode,
+            currentFlags: .maskControl,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp + 10_000_000,
+            mappings: defaultMappings()
+        )
+        let decision = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.j.keyCode,
+            currentFlags: .maskControl,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp + 20_000_000,
+            mappings: defaultMappings()
+        )
+        XCTAssertEqual(
+            decision.action,
+            .remap(keyCode: NumpadTargetKey.keypad4.keyCode, setNumericPadFlag: true)
+        )
+    }
+
+    func testDecidePassesThroughWhenNoLayerActive() {
+        var machine = LayerStateMachine()
+        let decision = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.h.keyCode,
+            currentFlags: [],
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp,
+            mappings: defaultMappings()
+        )
+        XCTAssertEqual(decision.action, .passThrough)
+    }
+
+    func testDecideConsumesSubTriggerAndSwitchesToNumpad() {
+        var machine = LayerStateMachine()
+        _ = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.space.keyCode,
+            currentFlags: .maskControl,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp,
+            mappings: defaultMappings()
+        )
+        let decision = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.a.keyCode,
+            currentFlags: .maskControl,
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp + 5_000_000,
+            mappings: defaultMappings()
+        )
+        XCTAssertEqual(decision, EventDecision(action: .consume, modeDidChange: true))
+        XCTAssertEqual(machine.mode, .numpad)
+    }
+
+    // MARK: - M3 sleep/wake recovery
+
+    private final class SleepWakeRecorder {
+        var reEnableTapCallCount = 0
+        var restartEngineCallCount = 0
+        var onErrorMessages: [String] = []
+        var tapAliveResponse = true
+    }
+
+    private func makeHandler(recorder: SleepWakeRecorder) -> SleepWakeHandler {
+        SleepWakeHandler(
+            reEnableTap: { recorder.reEnableTapCallCount += 1 },
+            isTapAlive: { recorder.tapAliveResponse },
+            restartEngine: { recorder.restartEngineCallCount += 1 },
+            onError: { recorder.onErrorMessages.append($0) }
+        )
+    }
+
+    func testSleepWakeWakeIsNoopWhenNoSleepSeen() {
+        let recorder = SleepWakeRecorder()
+        var handler = makeHandler(recorder: recorder)
+
+        handler.didWake()
+
+        XCTAssertEqual(recorder.reEnableTapCallCount, 0)
+        XCTAssertEqual(recorder.restartEngineCallCount, 0)
+        XCTAssertEqual(recorder.onErrorMessages, [])
+    }
+
+    func testSleepWakeReEnablesTapAfterSleep() {
+        let recorder = SleepWakeRecorder()
+        recorder.tapAliveResponse = true
+        var handler = makeHandler(recorder: recorder)
+
+        handler.willSleep()
+        XCTAssertTrue(handler.sleepPending)
+
+        handler.didWake()
+        XCTAssertFalse(handler.sleepPending)
+        XCTAssertEqual(recorder.reEnableTapCallCount, 1)
+        XCTAssertEqual(recorder.restartEngineCallCount, 0)
+        XCTAssertTrue(recorder.onErrorMessages.isEmpty)
+    }
+
+    func testSleepWakeRestartsEngineWhenTapDied() {
+        let recorder = SleepWakeRecorder()
+        recorder.tapAliveResponse = false
+        var handler = makeHandler(recorder: recorder)
+
+        handler.willSleep()
+        handler.didWake()
+
+        XCTAssertEqual(recorder.reEnableTapCallCount, 1)
+        XCTAssertEqual(recorder.restartEngineCallCount, 1)
+        XCTAssertEqual(recorder.onErrorMessages.count, 1)
+    }
+
+    func testSleepWakeSecondWakeWithoutSleepIsIgnored() {
+        let recorder = SleepWakeRecorder()
+        var handler = makeHandler(recorder: recorder)
+
+        handler.willSleep()
+        handler.didWake()
+        handler.didWake()
+
+        XCTAssertEqual(recorder.reEnableTapCallCount, 1)
+    }
+
+    // MARK: - M3 CapsLock + flag-hygiene regression
+
+    func testCapsLockDuringHoldDoesNotSuppressTapToEscape() {
+        var machine = LayerStateMachine()
+
+        let down = machine.decide(
+            eventType: .keyDown,
+            keyCode: InputKey.space.keyCode,
+            currentFlags: [.maskControl, .maskAlphaShift],
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp,
+            mappings: defaultMappings()
+        )
+        XCTAssertEqual(down.action, .enterLayerTrigger)
+
+        let up = machine.decide(
+            eventType: .keyUp,
+            keyCode: InputKey.space.keyCode,
+            currentFlags: [.maskControl, .maskAlphaShift],
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp + 50_000_000,
+            mappings: defaultMappings()
+        )
+        XCTAssertEqual(up.action, .exitLayerTrigger(emitEscape: true))
+    }
+
+    func testOutputFlagsAlwaysStripsMaskSecondaryFn() {
+        let machine = LayerStateMachine()
+        let cleaned = machine.outputFlags(for: [.maskSecondaryFn])
+        XCTAssertFalse(cleaned.contains(.maskSecondaryFn))
+    }
+
+    func testOutputFlagsStripsDefaultTriggerControlModifier() {
+        let machine = LayerStateMachine()
+        let cleaned = machine.outputFlags(for: [.maskControl, .maskShift])
+        XCTAssertFalse(cleaned.contains(.maskControl))
+        XCTAssertTrue(cleaned.contains(.maskShift),
+                      "Shift was not part of the trigger modifiers and should be preserved.")
+    }
+
+    func testOutputFlagsStripsCustomModifierSet() {
+        let triggers = TriggerProfile(
+            layerKey: .j,
+            layerModifiers: [.command, .option],
+            numpadSubTrigger: .a,
+            tapToEscapeEnabled: true
+        )
+        let machine = LayerStateMachine(triggers: triggers)
+        let cleaned = machine.outputFlags(for: [.maskCommand, .maskAlternate, .maskControl])
+        XCTAssertFalse(cleaned.contains(.maskCommand))
+        XCTAssertFalse(cleaned.contains(.maskAlternate))
+        XCTAssertTrue(cleaned.contains(.maskControl),
+                      "Control was not part of the custom trigger modifiers and should be preserved.")
+    }
+
+    func testOutputFlagsPreservesCapsLockAndShift() {
+        let machine = LayerStateMachine()
+        let cleaned = machine.outputFlags(for: [.maskControl, .maskAlphaShift, .maskShift])
+        XCTAssertTrue(cleaned.contains(.maskAlphaShift))
+        XCTAssertTrue(cleaned.contains(.maskShift))
+        XCTAssertFalse(cleaned.contains(.maskControl))
+    }
 }

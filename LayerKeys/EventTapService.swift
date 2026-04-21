@@ -1,5 +1,30 @@
+import AppKit
 import CoreGraphics
 import Foundation
+
+struct SleepWakeHandler {
+    var reEnableTap: () -> Void
+    var isTapAlive: () -> Bool
+    var restartEngine: () -> Void
+    var onError: (String) -> Void
+
+    private(set) var sleepPending = false
+
+    mutating func willSleep() {
+        sleepPending = true
+    }
+
+    mutating func didWake() {
+        guard sleepPending else { return }
+        sleepPending = false
+
+        reEnableTap()
+        if !isTapAlive() {
+            onError("Restarting event tap after sleep recovery.")
+            restartEngine()
+        }
+    }
+}
 
 final class EventTapService {
     var onModeChange: ((LayerMode) -> Void)?
@@ -8,6 +33,10 @@ final class EventTapService {
     private let lock = NSLock()
     private var profile: MappingProfile
     private var engine: EventTapEngine?
+
+    private var sleepObserver: NSObjectProtocol?
+    private var wakeObserver: NSObjectProtocol?
+    private var sleepWakeHandler: SleepWakeHandler?
 
     init(profile: MappingProfile) {
         self.profile = profile
@@ -41,11 +70,14 @@ final class EventTapService {
         let started = engine.start()
         if started {
             self.engine = engine
+            installSleepWakeObservers(for: engine)
         }
         return started
     }
 
     func stop() {
+        removeSleepWakeObservers()
+
         lock.lock()
         let engine = engine
         self.engine = nil
@@ -59,221 +91,48 @@ final class EventTapService {
         defer { lock.unlock() }
         return profile
     }
-}
 
-private final class EventTapEngine: NSObject {
-    private static let syntheticEscapeEventTag: Int64 = 0x4C4B455343
-
-    private let profileLock = NSLock()
-    private var resolvedMappings: ResolvedMappings
-    private var stateMachine: LayerStateMachine
-    private let onModeChange: (LayerMode) -> Void
-    private let onTapError: (String) -> Void
-
-    private var thread: Thread?
-    private var tapPort: CFMachPort?
-    private var runLoopSource: CFRunLoopSource?
-    private var runLoop: CFRunLoop?
-
-    init(
-        profile: MappingProfile,
-        onModeChange: @escaping (LayerMode) -> Void,
-        onTapError: @escaping (String) -> Void
-    ) {
-        resolvedMappings = profile.resolvedMappings
-        stateMachine = LayerStateMachine(triggers: profile.triggers)
-        self.onModeChange = onModeChange
-        self.onTapError = onTapError
-    }
-
-    func updateProfile(_ profile: MappingProfile) {
-        profileLock.lock()
-        resolvedMappings = profile.resolvedMappings
-        profileLock.unlock()
-    }
-
-    func start() -> Bool {
-        let startup = EventTapStartup()
-        let thread = Thread(target: self, selector: #selector(runEventTapThread(_:)), object: startup)
-
-        self.thread = thread
-        thread.start()
-        startup.semaphore.wait()
-        return startup.didStart
-    }
-
-    func stop() {
-        guard let thread else {
-            return
-        }
-
-        perform(#selector(stopRunLoop), on: thread, with: nil, waitUntilDone: true)
-        self.thread = nil
-    }
-
-    @objc
-    private func stopRunLoop() {
-        if let tapPort {
-            CGEvent.tapEnable(tap: tapPort, enable: false)
-            CFMachPortInvalidate(tapPort)
-        }
-
-        if let runLoopSource, let runLoop {
-            CFRunLoopRemoveSource(runLoop, runLoopSource, .commonModes)
-        }
-
-        tapPort = nil
-        runLoopSource = nil
-        if let runLoop {
-            CFRunLoopStop(runLoop)
-        }
-        runLoop = nil
-    }
-
-    @objc
-    private func runEventTapThread(_ startup: EventTapStartup) {
-        Thread.current.name = "LayerKeys.EventTap"
-        runLoop = CFRunLoopGetCurrent()
-
-        let eventMask =
-            (1 << CGEventType.keyDown.rawValue)
-            | (1 << CGEventType.keyUp.rawValue)
-
-        let userInfo = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
-        guard let tapPort = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: CGEventMask(eventMask),
-            callback: { proxy, type, event, userInfo in
-                guard let userInfo else {
-                    return Unmanaged.passUnretained(event)
-                }
-
-                let engine = Unmanaged<EventTapEngine>.fromOpaque(userInfo).takeUnretainedValue()
-                return engine.handle(proxy: proxy, type: type, event: event)
+    private func installSleepWakeObservers(for engine: EventTapEngine) {
+        sleepWakeHandler = SleepWakeHandler(
+            reEnableTap: { [weak engine] in engine?.reEnableTap() },
+            isTapAlive: { [weak engine] in engine?.isTapAlive() ?? false },
+            restartEngine: { [weak self] in
+                guard let self else { return }
+                self.stop()
+                _ = self.start()
             },
-            userInfo: userInfo
-        ) else {
-            onTapError("LayerKeys could not create the keyboard event tap.")
-            startup.semaphore.signal()
-            return
+            onError: { [weak self] message in
+                self?.onTapError?(message)
+            }
+        )
+
+        let center = NSWorkspace.shared.notificationCenter
+        sleepObserver = center.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.sleepWakeHandler?.willSleep()
         }
-
-        self.tapPort = tapPort
-        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tapPort, 0)
-        runLoopSource = source
-
-        if let source {
-            CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
-        }
-        CGEvent.tapEnable(tap: tapPort, enable: true)
-
-        startup.didStart = true
-        startup.semaphore.signal()
-        CFRunLoopRun()
-    }
-
-    private func handle(
-        proxy: CGEventTapProxy,
-        type: CGEventType,
-        event: CGEvent
-    ) -> Unmanaged<CGEvent>? {
-        switch type {
-        case .tapDisabledByTimeout, .tapDisabledByUserInput:
-            if let tapPort {
-                CGEvent.tapEnable(tap: tapPort, enable: true)
-            }
-            return Unmanaged.passUnretained(event)
-        case .keyDown, .keyUp:
-            if event.getIntegerValueField(.eventSourceUserData) == Self.syntheticEscapeEventTag {
-                return Unmanaged.passUnretained(event)
-            }
-
-            let keyCode = KeyCode(event.getIntegerValueField(.keyboardEventKeycode))
-            let isKeyDown = type == .keyDown
-
-            if keyCode == stateMachine.layerTriggerKeyCode {
-                if isKeyDown {
-                    guard event.flags.contains(stateMachine.layerTriggerRequiredFlags) else {
-                        return Unmanaged.passUnretained(event)
-                    }
-                    let didChange = stateMachine.handleTriggerKeyDown(timestamp: event.timestamp)
-                    if didChange {
-                        onModeChange(stateMachine.mode)
-                    }
-                } else {
-                    guard stateMachine.isLayerTriggerHeld else {
-                        return Unmanaged.passUnretained(event)
-                    }
-                    let result = stateMachine.handleTriggerKeyUp(timestamp: event.timestamp)
-                    if result.modeDidChange {
-                        onModeChange(stateMachine.mode)
-                    }
-                    if result.shouldEmitEscape, PermissionController.hasPostEventAccess {
-                        postEscapeTap(flags: outputFlags(for: event.flags))
-                    }
-                }
-                return nil
-            }
-
-            if stateMachine.handleKeyEvent(keyCode: keyCode, isKeyDown: isKeyDown) {
-                onModeChange(stateMachine.mode)
-                return nil
-            }
-
-            profileLock.lock()
-            let mappings = resolvedMappings
-            profileLock.unlock()
-
-            guard let remapped = mappings.remappedKeyCode(for: keyCode, mode: stateMachine.mode) else {
-                return Unmanaged.passUnretained(event)
-            }
-
-            event.setIntegerValueField(.keyboardEventKeycode, value: Int64(remapped))
-            var flags = outputFlags(for: event.flags)
-            if mappings.targetRequiresNumericPadFlag(remapped) {
-                flags.insert(.maskNumericPad)
-            } else {
-                flags.remove(.maskNumericPad)
-            }
-            event.flags = flags
-
-            return Unmanaged.passRetained(event)
-        default:
-            return Unmanaged.passUnretained(event)
+        wakeObserver = center.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.sleepWakeHandler?.didWake()
         }
     }
 
-    private func postEscapeTap(flags: CGEventFlags) {
-        guard let source = CGEventSource(stateID: .hidSystemState) else {
-            return
+    private func removeSleepWakeObservers() {
+        let center = NSWorkspace.shared.notificationCenter
+        if let sleepObserver {
+            center.removeObserver(sleepObserver)
         }
-
-        for isKeyDown in [true, false] {
-            guard let event = CGEvent(
-                keyboardEventSource: source,
-                virtualKey: LayerStateMachine.escapeKeyCode,
-                keyDown: isKeyDown
-            ) else {
-                continue
-            }
-
-            event.flags = flags
-            event.setIntegerValueField(.eventSourceUserData, value: Self.syntheticEscapeEventTag)
-            event.post(tap: .cghidEventTap)
+        if let wakeObserver {
+            center.removeObserver(wakeObserver)
         }
+        sleepObserver = nil
+        wakeObserver = nil
+        sleepWakeHandler = nil
     }
-
-    private func outputFlags(for originalFlags: CGEventFlags) -> CGEventFlags {
-        var flags = originalFlags
-        flags.remove(.maskSecondaryFn)
-        flags.remove(stateMachine.layerTriggerRequiredFlags)
-        return flags
-    }
-}
-
-private final class EventTapStartup: NSObject {
-    let semaphore = DispatchSemaphore(value: 0)
-    var didStart = false
 }
