@@ -33,18 +33,20 @@ thesis and, if they matter later, belong on the target side of the catalog
 - [x] Default `MappingProfile.default` is unchanged — verified by `testDefaultNumpadProfileOnlyContainsNineDigitBindings` still passing.
 - [x] Stored pre-M1 profiles continue to decode — verified by `testLegacyStoredDefaultMigratesToCurrentDefault` still passing (reordering existing cases is safe because `rawValue` is derived from case names).
 
-### M2: Configurable trigger
+### M2: Configurable trigger ✅
 
 The trigger chord (`Control+Space`) and numpad sub-trigger (`A`) are
-hardcoded. M2 makes both user-configurable while preserving the "tap-trigger
-emits Escape" semantics.
+user-configurable, with tap-to-Escape exposed as a user toggle. Trigger key
+is an `InputKey` (no F-keys, no CapsLock, no modifier-only — all deferred
+to a hypothetical "advanced triggers" milestone to stay consistent with
+M1's home-row identity; see `decisions.md` 2026-04-20).
 
-- [ ] `LayerStateMachine` reads `layerTriggerKeyCode`, `layerTriggerRequiredFlags`, and `numpadTriggerKeyCode` from a `TriggerProfile` value type instead of static lets — verified by all existing state-machine tests still passing.
-- [ ] `MappingProfile` (or a sibling `TriggerProfile`) gains trigger fields, persisted in `UserDefaults`, with a migration that maps any pre-M2 profile onto today's defaults — verified by a new `testPreM2ProfileMigratesTriggerToDefaults` test.
-- [ ] Settings exposes a "Triggers" tab letting users choose the trigger key (from an `InputKey`-or-modifier picker), required modifiers, and the numpad sub-trigger — verified by manual smoke test (set trigger to `CapsLock`, layer activates).
-- [ ] Conflict guard: the chosen trigger key cannot also appear as a layer source key, and the numpad sub-trigger cannot also be a layer source — verified by a unit test on a `TriggerProfile.validate()` API.
-- [ ] Tap-to-Escape replay still works on chord triggers (e.g. `⌃Space`) and is automatically disabled for triggers that don't make sense to "tap" (e.g. `CapsLock` alone) — verified by extending `LayerKeysTests`.
-- [ ] README + Settings copy updated; the "Triggers are fixed in v1" string is gone.
+- [x] `LayerStateMachine` reads `layerTriggerKeyCode`, `layerTriggerRequiredFlags`, and `numpadTriggerKeyCode` from a `TriggerProfile` value type instead of static lets — verified by all state-machine tests still passing plus `testLayerStateMachineUsesCustomTriggerKey`.
+- [x] `MappingProfile` gains `triggers: TriggerProfile`, persisted in `UserDefaults`, with default-inject on decode via custom `init(from:)` — verified by `testMappingProfileDecodesPreM2JsonWithDefaultTriggers` and `testMappingProfileRoundTripsPreservingTriggers`.
+- [x] Settings exposes a "Triggers" tab: layer-key picker (Category-grouped), modifier toggles (⌘ ⌃ ⌥ ⇧), numpad sub-trigger picker, tap-to-Escape toggle, live chord preview — verified manually.
+- [x] Validation warnings surfaced inline in the Triggers tab: empty modifiers on a typing-cluster layer key, sub-trigger equal to layer key, sub-trigger colliding with a nav source — verified by `testTriggerValidationFlags*` tests.
+- [x] Tap-to-Escape is a user toggle (default on); state machine reads `tapToEscapeEnabled` — verified by `testTapToEscapeDisabledViaTriggerProfile`.
+- [x] README + Settings + StatusMenu copy updated; the "Triggers are fixed in v1" string is gone; the status-menu instruction text is now derived from the live trigger profile.
 
 ### M3: Reliability & correctness pass
 
@@ -87,7 +89,7 @@ session by an agent of the appropriate tier. Run `/audit-backlog` to refill.
 
 ### Sonnet (some architectural judgment)
 
-- [ ] `LayerKeys/SettingsView.swift:110-192` — `NavigationBindingRow` and `NumpadBindingRow` are structurally identical; extract a single generic `BindingRow<TargetKey: Hashable & Identifiable & CaseIterable>` to remove the duplication.
+- [x] `LayerKeys/SettingsView.swift` — unified `NavigationBindingRow` and `NumpadBindingRow` into a single generic `BindingRow<Model: LayerBindingModel>` with fileprivate `LayerTargetKey` / `LayerBindingModel` protocols (done 2026-04-20 as a pre-M2 warmup; verified by `xcodebuild test` 16/16).
 - [ ] `LayerKeys/AppModel.swift:93-137` — the six `add/remove/update` binding methods duplicate logic across `navigation` and `numpad`. Extract a generic over a `WritableKeyPath` to `[Binding]` so the methods become two-line wrappers.
 - [ ] `LayerKeys/EventTapService.swift:64+` — the private `EventTapEngine` is ~210 lines and arguably the heart of the app; move it into its own `EventTapEngine.swift` file (still `internal`) so the service-vs-engine split is obvious from the project navigator.
 

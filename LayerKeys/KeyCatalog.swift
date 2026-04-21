@@ -146,6 +146,39 @@ enum InputKey: String, CaseIterable, Codable, Hashable, Identifiable {
     }
 }
 
+enum TriggerModifier: String, CaseIterable, Codable, Hashable, Identifiable {
+    case command
+    case control
+    case option
+    case shift
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .command: return "\u{2318}"
+        case .control: return "\u{2303}"
+        case .option:  return "\u{2325}"
+        case .shift:   return "\u{21E7}"
+        }
+    }
+
+    var eventFlag: CGEventFlags {
+        switch self {
+        case .command: return .maskCommand
+        case .control: return .maskControl
+        case .option:  return .maskAlternate
+        case .shift:   return .maskShift
+        }
+    }
+}
+
+extension Set where Element == TriggerModifier {
+    var eventFlags: CGEventFlags {
+        reduce(CGEventFlags()) { $0.union($1.eventFlag) }
+    }
+}
+
 enum NavigationTargetKey: String, CaseIterable, Codable, Hashable, Identifiable {
     case leftArrow
     case downArrow
@@ -292,9 +325,72 @@ struct NumpadBinding: Identifiable, Codable, Hashable {
     }
 }
 
+struct TriggerProfile: Codable, Hashable {
+    var layerKey: InputKey
+    var layerModifiers: Set<TriggerModifier>
+    var numpadSubTrigger: InputKey
+    var tapToEscapeEnabled: Bool
+
+    static let `default` = TriggerProfile(
+        layerKey: .space,
+        layerModifiers: [.control],
+        numpadSubTrigger: .a,
+        tapToEscapeEnabled: true
+    )
+
+    var chordSummary: String {
+        let modifiers = TriggerModifier.allCases
+            .filter { layerModifiers.contains($0) }
+            .map(\.title)
+            .joined()
+        return modifiers + layerKey.title
+    }
+}
+
+enum TriggerValidationIssue: Hashable {
+    case triggerNeedsModifiers(InputKey)
+    case subTriggerEqualsLayerKey
+    case subTriggerConflictsWithNavSource(InputKey)
+
+    var message: String {
+        switch self {
+        case let .triggerNeedsModifiers(key):
+            return "Pressing \(key.title) alone will enter the layer and block normal typing. Add a modifier (\u{2318} \u{2325} \u{2303} \u{21E7}) or choose a different key."
+        case .subTriggerEqualsLayerKey:
+            return "The numpad sub-trigger is the same as the layer trigger key. Pick a different key so the numpad can activate."
+        case let .subTriggerConflictsWithNavSource(key):
+            return "\(key.title) is also a Navigation layer source. Pressing it during nav will switch into numpad instead of emitting the nav binding."
+        }
+    }
+}
+
 struct MappingProfile: Codable, Hashable {
     var navigation: [NavigationBinding]
     var numpad: [NumpadBinding]
+    var triggers: TriggerProfile
+
+    init(
+        navigation: [NavigationBinding],
+        numpad: [NumpadBinding],
+        triggers: TriggerProfile = .default
+    ) {
+        self.navigation = navigation
+        self.numpad = numpad
+        self.triggers = triggers
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case navigation
+        case numpad
+        case triggers
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.navigation = try container.decode([NavigationBinding].self, forKey: .navigation)
+        self.numpad = try container.decode([NumpadBinding].self, forKey: .numpad)
+        self.triggers = try container.decodeIfPresent(TriggerProfile.self, forKey: .triggers) ?? .default
+    }
 
     static let legacyDefault = MappingProfile(
         navigation: [
@@ -358,6 +454,27 @@ struct MappingProfile: Codable, Hashable {
             numpad: numpadMap,
             numericPadTargets: numericPadTargets
         )
+    }
+
+    func validateTriggers() -> [TriggerValidationIssue] {
+        var issues: [TriggerValidationIssue] = []
+
+        if triggers.layerModifiers.isEmpty {
+            switch triggers.layerKey.category {
+            case .letters, .digits, .punctuation, .iso:
+                issues.append(.triggerNeedsModifiers(triggers.layerKey))
+            }
+        }
+
+        if triggers.numpadSubTrigger == triggers.layerKey {
+            issues.append(.subTriggerEqualsLayerKey)
+        }
+
+        if navigation.contains(where: { $0.source == triggers.numpadSubTrigger }) {
+            issues.append(.subTriggerConflictsWithNavSource(triggers.numpadSubTrigger))
+        }
+
+        return issues
     }
 }
 

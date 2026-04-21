@@ -66,7 +66,7 @@ private final class EventTapEngine: NSObject {
 
     private let profileLock = NSLock()
     private var resolvedMappings: ResolvedMappings
-    private var stateMachine = LayerStateMachine()
+    private var stateMachine: LayerStateMachine
     private let onModeChange: (LayerMode) -> Void
     private let onTapError: (String) -> Void
 
@@ -81,6 +81,7 @@ private final class EventTapEngine: NSObject {
         onTapError: @escaping (String) -> Void
     ) {
         resolvedMappings = profile.resolvedMappings
+        stateMachine = LayerStateMachine(triggers: profile.triggers)
         self.onModeChange = onModeChange
         self.onTapError = onTapError
     }
@@ -192,9 +193,9 @@ private final class EventTapEngine: NSObject {
             let keyCode = KeyCode(event.getIntegerValueField(.keyboardEventKeycode))
             let isKeyDown = type == .keyDown
 
-            if keyCode == LayerStateMachine.layerTriggerKeyCode {
+            if keyCode == stateMachine.layerTriggerKeyCode {
                 if isKeyDown {
-                    guard event.flags.contains(LayerStateMachine.layerTriggerRequiredFlags) else {
+                    guard event.flags.contains(stateMachine.layerTriggerRequiredFlags) else {
                         return Unmanaged.passUnretained(event)
                     }
                     let didChange = stateMachine.handleTriggerKeyDown(timestamp: event.timestamp)
@@ -267,7 +268,7 @@ private final class EventTapEngine: NSObject {
     private func outputFlags(for originalFlags: CGEventFlags) -> CGEventFlags {
         var flags = originalFlags
         flags.remove(.maskSecondaryFn)
-        flags.remove(LayerStateMachine.layerTriggerRequiredFlags)
+        flags.remove(stateMachine.layerTriggerRequiredFlags)
         return flags
     }
 }

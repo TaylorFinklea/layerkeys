@@ -136,6 +136,11 @@ final class AppModel: ObservableObject {
         saveMappings()
     }
 
+    func updateTriggerProfile(_ triggers: TriggerProfile) {
+        mappingProfile.triggers = triggers
+        saveMappings()
+    }
+
     func quit() {
         NSApplication.shared.terminate(nil)
     }

@@ -165,6 +165,58 @@ label, and `.space` is structurally the only other "non-letter typing
 cluster" key. This avoids both a lonely section and an unlabeled
 mystery-bucket.
 
+## [2026-04-20] M2 trigger model: `InputKey` + modifiers, no new enum
+
+**Context**: M2 planning. Original proposal floated a separate `TriggerKey`
+enum that would be a superset of `InputKey` plus F1–F19, Escape, Return,
+Tab, Delete, and CapsLock. User pushed back with "Why are we still doing
+function keys?" — correctly pointing out the inconsistency with M1's
+dropped function-key decision.
+
+**Decision**: Trigger key is an `InputKey`. Modifiers are a
+`Set<TriggerModifier>` (⌘ ⌃ ⌥ ⇧). Numpad sub-trigger is an `InputKey`.
+No new `TriggerKey` enum. Tap-to-Escape is a user toggle on
+`TriggerProfile` (default on). Modifier-only triggers (e.g. right-⌘
+alone), CapsLock, and function keys as triggers are all deferred to a
+hypothetical "advanced triggers" milestone.
+
+**Alternatives considered**:
+- Separate `TriggerKey` superset with F-keys + special keys (original
+  proposal, rejected for M1 inconsistency).
+- Reuse/expand `InputKey` to include F-keys (rejected because it reverses
+  the M1 `decisions.md` 2026-04-19 ADR).
+- Support modifier-only triggers with full left/right distinction
+  (rejected for M2 scope — needs NSEvent device-dependent flags).
+- Auto-disable tap-to-Escape for "dumb-to-tap" triggers (rejected as
+  surprising; explicit user toggle is clearer).
+
+**Rationale**: Consistency with M1's home-row thesis. The trigger is
+pressed every time the user wants a layer; reaching for F13 each time
+betrays the whole point. Users who want modifier-y triggers get there
+via chords (`⌃Space`, `⌘/`, `⌥A`, etc.), not via special single keys.
+One enum to maintain. The Triggers tab's key picker is literally the
+same `Section`-grouped `InputKey` picker the `BindingRow` already uses.
+
+## [2026-04-20] M2 migration: default-inject trigger field on decode
+
+**Context**: Existing users have pre-M2 saved profiles in `UserDefaults`
+that don't have a `triggers` field. Needed a migration strategy.
+
+**Decision**: Custom `init(from decoder:)` on `MappingProfile` that does
+`triggers = try container.decodeIfPresent(TriggerProfile.self, forKey:
+.triggers) ?? .default`. No schema version number, no legacy-shape
+conversion.
+
+**Alternatives considered**:
+- Schema-versioned migration (`schemaVersion: Int` field, explicit
+  upgrade path).
+- Legacy-shape conversion mirroring the existing `legacyDefault` pattern.
+
+**Rationale**: Simplest Swift-idiomatic approach. Default-inject also
+handles the forward-compatibility case (future non-breaking additions
+need only another `decodeIfPresent`). Schema versioning would be
+premature; we don't have a migration chain worth organizing yet.
+
 ## [2026-04-18] Backlog `tier3_owner: claude`
 
 **Context**: The shared workflow lets repos pick which agent owns Opus-tier

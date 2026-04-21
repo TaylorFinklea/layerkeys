@@ -2,13 +2,17 @@
 
 LayerKeys is a macOS menu bar app for navigation and numpad layers without kernel extensions or Karabiner-style configuration.
 
-## Current defaults
+## Defaults
+
+Out of the box:
 
 - Hold `Control+Space` to enter the navigation layer.
 - Tap `Control+Space` to emit a normal `Escape`.
-- While the navigation layer is active, press `A` to switch into the numpad layer until `Space` is released.
-- Default nav bindings: `H/J/K/L` to arrows.
-- Default numpad bindings: `U/I/O`, `J/K/L`, `M/,/.` to keypad digits.
+- While the navigation layer is active, press `A` to switch into the numpad layer until the trigger is released.
+- Nav bindings: `H/J/K/L` to arrows.
+- Numpad bindings: `U/I/O`, `J/K/L`, `M/,/.` to keypad digits.
+
+Everything is configurable in **Settings → Triggers** and **Settings → Mappings**: pick a different layer trigger chord (any `⌘ ⌃ ⌥ ⇧` combination plus any typing-cluster key), change the numpad sub-trigger, toggle tap-to-Escape, and edit which source keys emit which arrow / keypad keys.
 
 ## Install
 
@@ -29,9 +33,9 @@ xattr -dr com.apple.quarantine "/Applications/LayerKeys.app"
 LayerKeys needs:
 
 - `Input Monitoring` to intercept global key events and remap them.
-- `Accessibility` only if you want tap `Control+Space` to replay a normal `Escape`.
+- `Accessibility` only if you want tap-trigger to replay a normal `Escape`.
 
-Without Accessibility, the layer behavior still works, but tap-to-escape replay is disabled.
+Without Accessibility, the layer behavior still works, but tap-to-Escape replay is disabled.
 
 ## Build locally
 

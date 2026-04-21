@@ -33,7 +33,7 @@ struct StatusMenuView: View {
 
             Divider()
 
-            Text("Tap Control+Space for Escape. Hold Control+Space for navigation. Press A after the layer is active to switch into numpad until Space is released.")
+            Text(instructionText)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
@@ -61,5 +61,18 @@ struct StatusMenuView: View {
         }
         .padding()
         .frame(width: 320)
+    }
+
+    private var instructionText: String {
+        let triggers = model.mappingProfile.triggers
+        let chord = triggers.chordSummary
+        let sub = triggers.numpadSubTrigger.title
+        var parts: [String] = []
+        if triggers.tapToEscapeEnabled {
+            parts.append("Tap \(chord) for Escape.")
+        }
+        parts.append("Hold \(chord) for navigation.")
+        parts.append("Press \(sub) while the layer is active to switch into numpad.")
+        return parts.joined(separator: " ")
     }
 }

@@ -13,11 +13,26 @@ struct LayerStateMachine {
     private(set) var shouldEmitEscapeOnTriggerKeyUp = false
     private(set) var triggerKeyDownTimestamp: UInt64?
 
+    var triggers: TriggerProfile
+
     static let escapeKeyCode: KeyCode = 0x35
-    static let layerTriggerKeyCode = InputKey.space.keyCode
-    static let layerTriggerRequiredFlags: CGEventFlags = .maskControl
-    static let numpadTriggerKeyCode = InputKey.a.keyCode
     static let escapeTapThreshold: UInt64 = 200_000_000
+
+    init(triggers: TriggerProfile = .default) {
+        self.triggers = triggers
+    }
+
+    var layerTriggerKeyCode: KeyCode {
+        triggers.layerKey.keyCode
+    }
+
+    var layerTriggerRequiredFlags: CGEventFlags {
+        triggers.layerModifiers.eventFlags
+    }
+
+    var numpadTriggerKeyCode: KeyCode {
+        triggers.numpadSubTrigger.keyCode
+    }
 
     @discardableResult
     mutating func handleTriggerKeyDown(timestamp: UInt64) -> Bool {
@@ -27,7 +42,7 @@ struct LayerStateMachine {
 
         isLayerTriggerHeld = true
         triggerKeyDownTimestamp = timestamp
-        shouldEmitEscapeOnTriggerKeyUp = true
+        shouldEmitEscapeOnTriggerKeyUp = triggers.tapToEscapeEnabled
         let didChange = mode != .nav
         mode = .nav
         return didChange
@@ -65,17 +80,17 @@ struct LayerStateMachine {
             return false
         }
 
-        if keyCode != Self.layerTriggerKeyCode, isKeyDown {
+        if keyCode != layerTriggerKeyCode, isKeyDown {
             shouldEmitEscapeOnTriggerKeyUp = false
         }
 
-        if isKeyDown, mode == .nav, keyCode == Self.numpadTriggerKeyCode {
+        if isKeyDown, mode == .nav, keyCode == numpadTriggerKeyCode {
             mode = .numpad
             shouldSwallowTriggerKeyUp = true
             return true
         }
 
-        if !isKeyDown, shouldSwallowTriggerKeyUp, keyCode == Self.numpadTriggerKeyCode {
+        if !isKeyDown, shouldSwallowTriggerKeyUp, keyCode == numpadTriggerKeyCode {
             shouldSwallowTriggerKeyUp = false
             return true
         }

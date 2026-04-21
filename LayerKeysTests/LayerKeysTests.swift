@@ -188,4 +188,167 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertEqual(InputKey.leftBracket.category, .punctuation)
         XCTAssertEqual(InputKey.sectionKey.category, .iso)
     }
+
+    func testTriggerProfileDefaultsMatchV010Behavior() {
+        let triggers = TriggerProfile.default
+        XCTAssertEqual(triggers.layerKey, .space)
+        XCTAssertEqual(triggers.layerModifiers, [.control])
+        XCTAssertEqual(triggers.numpadSubTrigger, .a)
+        XCTAssertTrue(triggers.tapToEscapeEnabled)
+    }
+
+    func testTriggerModifierEventFlagsMatchCGEventFlags() {
+        XCTAssertEqual(TriggerModifier.command.eventFlag, .maskCommand)
+        XCTAssertEqual(TriggerModifier.control.eventFlag, .maskControl)
+        XCTAssertEqual(TriggerModifier.option.eventFlag,  .maskAlternate)
+        XCTAssertEqual(TriggerModifier.shift.eventFlag,   .maskShift)
+
+        let combined: Set<TriggerModifier> = [.control, .option]
+        let flags = combined.eventFlags
+        XCTAssertTrue(flags.contains(.maskControl))
+        XCTAssertTrue(flags.contains(.maskAlternate))
+        XCTAssertFalse(flags.contains(.maskCommand))
+        XCTAssertFalse(flags.contains(.maskShift))
+    }
+
+    func testLayerStateMachineUsesCustomTriggerKey() {
+        let custom = TriggerProfile(
+            layerKey: .semicolon,
+            layerModifiers: [.command],
+            numpadSubTrigger: .a,
+            tapToEscapeEnabled: true
+        )
+        var machine = LayerStateMachine(triggers: custom)
+        XCTAssertEqual(machine.layerTriggerKeyCode, InputKey.semicolon.keyCode)
+        XCTAssertEqual(machine.layerTriggerRequiredFlags, .maskCommand)
+
+        XCTAssertTrue(machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp))
+        XCTAssertEqual(machine.mode, .nav)
+    }
+
+    func testCustomNumpadSubTriggerSwitchesLayer() {
+        let custom = TriggerProfile(
+            layerKey: .space,
+            layerModifiers: [.control],
+            numpadSubTrigger: .quote,
+            tapToEscapeEnabled: true
+        )
+        var machine = LayerStateMachine(triggers: custom)
+        _ = machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp)
+
+        // Legacy sub-trigger `A` should NOT switch to numpad.
+        XCTAssertFalse(machine.handleKeyEvent(keyCode: InputKey.a.keyCode, isKeyDown: true))
+        XCTAssertEqual(machine.mode, .nav)
+
+        // Custom sub-trigger should switch to numpad.
+        XCTAssertTrue(machine.handleKeyEvent(keyCode: InputKey.quote.keyCode, isKeyDown: true))
+        XCTAssertEqual(machine.mode, .numpad)
+    }
+
+    func testTapToEscapeDisabledViaTriggerProfile() {
+        let custom = TriggerProfile(
+            layerKey: .space,
+            layerModifiers: [.control],
+            numpadSubTrigger: .a,
+            tapToEscapeEnabled: false
+        )
+        var machine = LayerStateMachine(triggers: custom)
+        _ = machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp)
+
+        let result = machine.handleTriggerKeyUp(timestamp: triggerDownTimestamp + 50_000_000)
+        XCTAssertTrue(result.modeDidChange)
+        XCTAssertFalse(result.shouldEmitEscape)
+    }
+
+    func testMappingProfileDecodesPreM2JsonWithDefaultTriggers() throws {
+        let preM2Json = """
+        {
+            "navigation": [
+                {"id":"00000000-0000-0000-0000-000000000001","source":"h","target":"leftArrow"}
+            ],
+            "numpad": []
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(MappingProfile.self, from: preM2Json)
+        XCTAssertEqual(decoded.navigation.count, 1)
+        XCTAssertEqual(decoded.numpad.count, 0)
+        XCTAssertEqual(decoded.triggers, .default)
+    }
+
+    func testMappingProfileRoundTripsPreservingTriggers() throws {
+        let original = MappingProfile(
+            navigation: [NavigationBinding(source: .h, target: .leftArrow)],
+            numpad: [],
+            triggers: TriggerProfile(
+                layerKey: .semicolon,
+                layerModifiers: [.command, .option],
+                numpadSubTrigger: .quote,
+                tapToEscapeEnabled: false
+            )
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(MappingProfile.self, from: data)
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testDefaultProfileProducesNoTriggerValidationIssues() {
+        XCTAssertEqual(MappingProfile.default.validateTriggers(), [])
+    }
+
+    func testTriggerValidationFlagsEmptyModifiersOnTypingKey() {
+        let profile = MappingProfile(
+            navigation: [],
+            numpad: [],
+            triggers: TriggerProfile(
+                layerKey: .j,
+                layerModifiers: [],
+                numpadSubTrigger: .a,
+                tapToEscapeEnabled: true
+            )
+        )
+        let issues = profile.validateTriggers()
+        XCTAssertEqual(issues, [.triggerNeedsModifiers(.j)])
+    }
+
+    func testTriggerValidationFlagsSubTriggerEqualsLayerKey() {
+        let profile = MappingProfile(
+            navigation: [],
+            numpad: [],
+            triggers: TriggerProfile(
+                layerKey: .a,
+                layerModifiers: [.control],
+                numpadSubTrigger: .a,
+                tapToEscapeEnabled: true
+            )
+        )
+        XCTAssertTrue(profile.validateTriggers().contains(.subTriggerEqualsLayerKey))
+    }
+
+    func testTriggerValidationFlagsSubTriggerCollisionWithNavSource() {
+        let profile = MappingProfile(
+            navigation: [NavigationBinding(source: .h, target: .leftArrow)],
+            numpad: [],
+            triggers: TriggerProfile(
+                layerKey: .space,
+                layerModifiers: [.control],
+                numpadSubTrigger: .h,
+                tapToEscapeEnabled: true
+            )
+        )
+        XCTAssertTrue(
+            profile.validateTriggers().contains(.subTriggerConflictsWithNavSource(.h))
+        )
+    }
+
+    func testTriggerChordSummaryFormatting() {
+        let triggers = TriggerProfile(
+            layerKey: .space,
+            layerModifiers: [.control, .option],
+            numpadSubTrigger: .a,
+            tapToEscapeEnabled: true
+        )
+        // Modifiers rendered in the stable allCases order (command, control, option, shift).
+        XCTAssertEqual(triggers.chordSummary, "\u{2303}\u{2325}Space")
+    }
 }

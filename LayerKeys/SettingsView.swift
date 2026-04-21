@@ -10,6 +10,11 @@ struct SettingsView: View {
                     Label("Mappings", systemImage: "keyboard")
                 }
 
+            triggersView
+                .tabItem {
+                    Label("Triggers", systemImage: "hand.tap")
+                }
+
             permissionsView
                 .tabItem {
                     Label("Permissions", systemImage: "lock.shield")
@@ -24,14 +29,15 @@ struct SettingsView: View {
             Text("Layer Mappings")
                 .font(.title2.weight(.semibold))
 
-            Text("Triggers are fixed in v1: hold Control+Space for navigation, tap Control+Space for Escape, and press A after the layer is active to switch from navigation to numpad.")
+            Text("Bindings fire while the layer trigger is held. Configure the trigger chord itself in the Triggers tab.")
                 .foregroundStyle(.secondary)
 
             Form {
                 Section("Navigation Layer") {
                     ForEach($model.mappingProfile.navigation) { $binding in
-                        NavigationBindingRow(
+                        BindingRow(
                             binding: $binding,
+                            targetWidth: 160,
                             onDelete: { model.removeNavigationBinding(id: binding.id) },
                             onChange: model.saveMappings
                         )
@@ -44,8 +50,9 @@ struct SettingsView: View {
 
                 Section("Numpad Layer") {
                     ForEach($model.mappingProfile.numpad) { $binding in
-                        NumpadBindingRow(
+                        BindingRow(
                             binding: $binding,
+                            targetWidth: 180,
                             onDelete: { model.removeNumpadBinding(id: binding.id) },
                             onChange: model.saveMappings
                         )
@@ -68,6 +75,85 @@ struct SettingsView: View {
                 Text("If two entries use the same source key, the lower entry wins.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var triggersView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Triggers")
+                .font(.title2.weight(.semibold))
+
+            Text("The layer trigger is the chord you press to activate the navigation layer. While the layer is active, press the numpad sub-trigger to switch into the numpad layer until you release the trigger.")
+                .foregroundStyle(.secondary)
+
+            Form {
+                Section("Layer trigger") {
+                    LabeledContent("Key") {
+                        InputKeyPicker(selection: $model.mappingProfile.triggers.layerKey)
+                            .onChange(of: model.mappingProfile.triggers.layerKey) { _, _ in
+                                model.saveMappings()
+                            }
+                    }
+
+                    LabeledContent("Modifiers") {
+                        HStack(spacing: 8) {
+                            ForEach(TriggerModifier.allCases) { modifier in
+                                Toggle(modifier.title, isOn: Binding(
+                                    get: { model.mappingProfile.triggers.layerModifiers.contains(modifier) },
+                                    set: { isOn in
+                                        if isOn {
+                                            model.mappingProfile.triggers.layerModifiers.insert(modifier)
+                                        } else {
+                                            model.mappingProfile.triggers.layerModifiers.remove(modifier)
+                                        }
+                                        model.saveMappings()
+                                    }
+                                ))
+                                .toggleStyle(.button)
+                            }
+                        }
+                    }
+                }
+
+                Section("Numpad sub-trigger") {
+                    LabeledContent("Key") {
+                        InputKeyPicker(selection: $model.mappingProfile.triggers.numpadSubTrigger)
+                            .onChange(of: model.mappingProfile.triggers.numpadSubTrigger) { _, _ in
+                                model.saveMappings()
+                            }
+                    }
+                }
+
+                Section("Tap to Escape") {
+                    Toggle(
+                        "Emit Escape when the trigger is tapped without another key",
+                        isOn: $model.mappingProfile.triggers.tapToEscapeEnabled
+                    )
+                    .onChange(of: model.mappingProfile.triggers.tapToEscapeEnabled) { _, _ in
+                        model.saveMappings()
+                    }
+                }
+            }
+            .formStyle(.grouped)
+
+            HStack(spacing: 6) {
+                Text("Current trigger:")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Text(model.mappingProfile.triggers.chordSummary)
+                    .font(.footnote.monospaced())
+            }
+
+            let issues = model.mappingProfile.validateTriggers()
+            if !issues.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(issues, id: \.self) { issue in
+                        Label(issue.message, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    }
+                }
             }
         }
     }
@@ -107,84 +193,64 @@ struct SettingsView: View {
     }
 }
 
-private struct NavigationBindingRow: View {
-    @Binding var binding: NavigationBinding
-    let onDelete: () -> Void
-    let onChange: () -> Void
+private protocol LayerTargetKey: CaseIterable, Hashable, Identifiable {
+    var title: String { get }
+}
+
+extension NavigationTargetKey: LayerTargetKey {}
+extension NumpadTargetKey: LayerTargetKey {}
+
+private protocol LayerBindingModel: Identifiable {
+    associatedtype Target: LayerTargetKey
+    var source: InputKey { get set }
+    var target: Target { get set }
+}
+
+extension NavigationBinding: LayerBindingModel {}
+extension NumpadBinding: LayerBindingModel {}
+
+private struct InputKeyPicker: View {
+    @Binding var selection: InputKey
+    var width: CGFloat = 160
 
     var body: some View {
-        HStack {
-            Picker("From", selection: $binding.source) {
-                ForEach(InputKey.Category.allCases, id: \.self) { category in
-                    Section(category.title) {
-                        ForEach(InputKey.cases(in: category)) { key in
-                            Text(key.title).tag(key)
-                        }
+        Picker("Key", selection: $selection) {
+            ForEach(InputKey.Category.allCases, id: \.self) { category in
+                Section(category.title) {
+                    ForEach(InputKey.cases(in: category)) { key in
+                        Text(key.title).tag(key)
                     }
                 }
             }
-            .labelsHidden()
-            .frame(width: 140)
-            .onChange(of: binding.source) { _, _ in
-                onChange()
-            }
-
-            Image(systemName: "arrow.right")
-                .foregroundStyle(.secondary)
-
-            Picker("To", selection: $binding.target) {
-                ForEach(NavigationTargetKey.allCases) { key in
-                    Text(key.title).tag(key)
-                }
-            }
-            .labelsHidden()
-            .frame(width: 160)
-            .onChange(of: binding.target) { _, _ in
-                onChange()
-            }
-
-            Spacer()
-
-            Button(role: .destructive, action: onDelete) {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.borderless)
         }
+        .labelsHidden()
+        .frame(width: width)
     }
 }
 
-private struct NumpadBindingRow: View {
-    @Binding var binding: NumpadBinding
+private struct BindingRow<Model: LayerBindingModel>: View {
+    @Binding var binding: Model
+    let targetWidth: CGFloat
     let onDelete: () -> Void
     let onChange: () -> Void
 
     var body: some View {
         HStack {
-            Picker("From", selection: $binding.source) {
-                ForEach(InputKey.Category.allCases, id: \.self) { category in
-                    Section(category.title) {
-                        ForEach(InputKey.cases(in: category)) { key in
-                            Text(key.title).tag(key)
-                        }
-                    }
+            InputKeyPicker(selection: $binding.source, width: 140)
+                .onChange(of: binding.source) { _, _ in
+                    onChange()
                 }
-            }
-            .labelsHidden()
-            .frame(width: 140)
-            .onChange(of: binding.source) { _, _ in
-                onChange()
-            }
 
             Image(systemName: "arrow.right")
                 .foregroundStyle(.secondary)
 
             Picker("To", selection: $binding.target) {
-                ForEach(NumpadTargetKey.allCases) { key in
+                ForEach(Array(Model.Target.allCases)) { key in
                     Text(key.title).tag(key)
                 }
             }
             .labelsHidden()
-            .frame(width: 180)
+            .frame(width: targetWidth)
             .onChange(of: binding.target) { _, _ in
                 onChange()
             }
