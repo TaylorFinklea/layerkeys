@@ -61,21 +61,56 @@ into M4 polish; see `decisions.md` 2026-04-20 entry).
 - [x] CapsLock state during hold doesn't break tap-to-Escape — verified by `testCapsLockDuringHoldDoesNotSuppressTapToEscape` plus 4 `testOutputFlags*` hygiene tests asserting the trigger modifier set is stripped, `.maskSecondaryFn` is always stripped, and non-trigger modifiers (`.maskShift`, `.maskAlphaShift`) pass through untouched.
 - [x] **Pre-M3 warmup**: extracted `EventTapEngine` + `EventTapStartup` (and the new `TapLivenessProbe`) from `EventTapService.swift` into `LayerKeys/EventTapEngine.swift`. Sonnet-tier backlog item `[x]`.
 
-### M4: Notarized v1.0 — onboarding, launch-at-login, polish
+### M4a: Release pipeline — signed, notarized, auto-updating (ships 0.2.0)
 
-The shipping milestone. Goal: a stranger types `brew install --cask
-TaylorFinklea/tap/layerkeys`, opens the app, and never sees a `xattr` command,
-never reads the README, and is in the navigation layer within 30 seconds.
+The distribution milestone. Goal: a stranger types `brew install --cask
+TaylorFinklea/tap/layerkeys` on a fresh Mac, opens the app, sees no
+Gatekeeper dialog and runs no `xattr`, and gets the in-app
+"update available" prompt on the next release. UI is unchanged from M3.
+M4 was originally one milestone; split into M4a (this) + M4b (UX polish)
+on 2026-04-29 per `decisions.md` (rationale: different blast radii, want
+to verify the pipeline independently of UX work).
 
-- [ ] Developer ID Application signing wired into `scripts/package_release.sh` and the `release.yml` workflow, with cert + private key stored as GitHub secrets — verified by `codesign -dv --verbose=4 LayerKeys.app` showing the team ID.
-- [ ] `notarytool` integration in CI using a stored keychain profile (Apple ID / app-specific password / team ID as secrets); release artifact is stapled — verified by `xcrun stapler validate dist/LayerKeys.app` and `spctl --assess --type execute -vv` showing "accepted".
-- [ ] README's `xattr` instruction is removed and the cask no longer needs `--no-quarantine`.
-- [ ] Sparkle integrated with EdDSA-signed appcast hosted on the GitHub release; auto-update prompt appears on a new release — verified by manual upgrade from a prior tag.
-- [ ] Launch-at-login via `SMAppService.mainApp.register()`, with a Settings toggle and clean unregister on disable — verified by login-item smoke test.
-- [ ] First-run onboarding window: explains the trigger, requests Input Monitoring + Accessibility permissions inline, and dismisses itself once both are granted — verified by deleting the app's TCC entries and relaunching.
+**Phase A — pure in-app code (✅ shipped):**
+
+- [x] Sparkle 2.x SPM dependency wired into `project.yml`; `SPUStandardUpdaterController` owned by `LayerKeysApp`; "Check for Updates…" exposed in both Settings and the menu-bar dropdown — verified by `xcodebuild test` 51/51 (commit `59f0ef0`).
+- [x] `LaunchAtLoginController` wraps `SMAppService.mainApp` behind a `LaunchAtLoginStore` protocol (TDD'd against 4 tests); `AppModel` exposes `launchAtLoginEnabled` + `toggleLaunchAtLogin()`; Settings "General" tab carries the toggle; `NSAlert` first-launch prompt fires once via `didShowLaunchAtLoginPrompt` UserDefaults flag (commit `750cbd2`).
+- [x] Real Sparkle EdDSA public key installed in `info.properties` (`l2ghc9Y6kQcCddTEo6oRIJ2KL3rrE1ji/Xz+i9bme70=`); private key stored in user keychain (commit `18f449b`).
+
+**Phase B — Developer ID signing + notarization:**
+
+- [x] **B.2**: `scripts/package_release.sh` always builds unsigned then signs with `codesign --options runtime --timestamp --deep --sign "$DEVELOPER_ID"`; submits via `xcrun notarytool submit --wait` (auto-picks keychain-profile vs Apple-ID-env-var auth); staples ticket; re-zips; verifies with `stapler validate` + `spctl --assess`. Local sign+verify path validated end-to-end (signed app passes `codesign --verify --deep --strict`); notarization itself awaits B.1 (commit `116a2e6`).
+- [ ] **B.1** *(user action)*: `xcrun notarytool store-credentials layerkeys-notarytool --apple-id <id> --team-id K7CBQW6MPG --password <app-specific-password>` after generating an app-specific password at appleid.apple.com.
+- [ ] **B.3**: run `./scripts/package_release.sh` end-to-end and confirm `xcrun stapler validate` + `spctl --assess --type execute -vv` both report "accepted" + "notarized".
+
+**Phase D — GitHub repo + CI secrets:**
+
+- [ ] `gh repo create TaylorFinklea/layerkeys --public --source . --push` to bring the local repo onto GitHub. (Cask URL already points there; the repo just doesn't exist yet.)
+- [ ] Provision GitHub Actions secrets via `gh secret set`: `APPLE_DEVID_CERT_P12_BASE64`, `APPLE_DEVID_CERT_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_PASSWORD`, `NOTARY_TEAM_ID=K7CBQW6MPG`, `SPARKLE_EDDSA_PRIVATE_KEY`.
+- [ ] `.github/workflows/release.yml` updated: cert-import-from-secrets into a temp keychain, run `package_release.sh` (which signs + notarizes), generate `appcast.xml` via Sparkle's `generate_appcast`, upload both `LayerKeys.zip` and `appcast.xml` as release assets.
+
+**Phase E — cut 0.2.0:**
+
+- [ ] Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` to `0.2.0` in `project.yml`; regenerate xcodeproj.
+- [ ] Tag `v0.2.0`; push tag; CI runs end-to-end and publishes the release.
+- [ ] `./scripts/update_homebrew_tap.sh` rewrites the cask sha + version; commit + push the tap repo.
+- [ ] Smoke test: `brew install --cask TaylorFinklea/tap/layerkeys` on a fresh setup; app opens with no Gatekeeper dialog; first-launch prompt appears once.
+
+**Phase F — README + docs:**
+
+- [ ] Remove the `xattr -dr com.apple.quarantine` instruction from README; add a one-line "LayerKeys checks for updates automatically" note.
+- [x] **F.3**: handoff docs updated — M4 split logged in `decisions.md`, this milestone reflects Phase A→F resumption order, `current-state.md` + `next-steps.md` point at remaining phases.
+
+### M4b: 1.0 polish — onboarding, conflict warnings, icon, marketing
+
+Once M4a ships 0.2.0, M4b takes the app from "stranger can install it" to
+"stranger sticks with it." UI work, no further pipeline changes.
+
+- [ ] First-run onboarding window: explains the trigger chord, requests Input Monitoring + Accessibility permissions inline, and dismisses itself once both are granted — verified by deleting the app's TCC entries and relaunching. (Richer than M4a's launch-at-login one-shot; that prompt stays.)
 - [ ] Conflict warnings in the binding editor: when two bindings share a source key, the row that "loses" gets a non-blocking warning chip — verified visually.
 - [ ] App icon refresh — replace the `generate_app_icon.swift` placeholder with a deliberate icon set — verified visually at all required sizes.
 - [ ] Marketing pass: README screenshots, GIF of nav/numpad in action, accurate permission language, link to landing copy.
+- [ ] Non-US keyboard-layout glyph labels in Settings pickers (deferred from M3).
 - [ ] Version bumped to `1.0.0` in `project.yml`, tagged `v1.0.0`, release published, Homebrew tap updated — verified by `brew install --cask TaylorFinklea/tap/layerkeys` on a fresh machine.
 
 ## Backlog (parallel, tiered by model capability)
@@ -103,10 +138,11 @@ session by an agent of the appropriate tier. Run `/audit-backlog` to refill.
 
 ## Priority Order
 
-1. **M1** (source-key catalog) — unblocks M2 and is the lowest-risk capability win.
-2. **M2** (configurable trigger) — depends on M1's expanded `InputKey`.
-3. **M3** (reliability) — needed before we ask strangers to install via brew.
-4. **M4** (v1.0 notarization + polish) — the public shipping milestone.
+1. **M1** (source-key catalog) — unblocks M2 and is the lowest-risk capability win. ✅ shipped.
+2. **M2** (configurable trigger) — depends on M1's expanded `InputKey`. ✅ shipped.
+3. **M3** (reliability) — needed before we ask strangers to install via brew. ✅ shipped.
+4. **M4a** (release pipeline, ships 0.2.0) — Gatekeeper-clean install + Sparkle auto-update + launch-at-login. *In progress*: Phase A shipped; Phase B awaits user-provisioned notarytool credential; Phases D–F follow.
+5. **M4b** (1.0 polish, ships 1.0.0) — first-run onboarding, conflict warnings, hand-designed icon, marketing pass.
 
 Backlog runs alongside any milestone.
 

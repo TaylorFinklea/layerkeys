@@ -281,3 +281,131 @@ new test seams) when the user runs `/process-backlog-opus`.
 **Rationale**: User-stated preference. Claude is the active agent in this
 repo; the other tools can still pick up Haiku/Sonnet items from the same
 backlog.
+
+## [2026-04-29] M4 split into M4a (release pipeline) + M4b (UX polish)
+
+**Context**: M4 originally bundled signing, notarization, Sparkle, launch-at-login,
+onboarding, conflict warnings, app icon, and marketing pass into one
+milestone. That's a large chunk and the dependencies are skewed:
+signing/notarization/Sparkle/launch-at-login are pipeline infrastructure
+gated on external prereqs (Apple Developer ID cert, notarytool credential,
+Sparkle keys, GitHub repo + secrets), while richer onboarding, the
+conflict-warnings UI, the icon refresh, and the marketing pass are
+UI work that needs the pipeline to already exist.
+
+**Decision**: Split M4 into M4a (release pipeline, ships 0.2.0 — Gatekeeper-clean,
+auto-updating, optional launch-at-login, UI otherwise unchanged) and M4b
+(richer onboarding, conflict warnings, hand-designed icon, marketing pass,
+ships 1.0.0).
+
+**Alternatives considered**: keep the single M4 bundle and ship one giant
+1.0.0; ship the polish before the pipeline; ship the pipeline as a 0.1.1
+bugfix release.
+
+**Rationale**: The blast radius is different — M4a wires distribution; M4b
+shapes first impressions. Verifying them independently is valuable: a real
+user installing a notarized 0.2.0 today validates the whole pipeline
+end-to-end, and that lesson is worth more before a 1.0.0 onboarding push
+than baked into it. Naming the split-out 0.2.0 also signals to users that
+this isn't *the* 1.0 release — the polish is still to come.
+
+## [2026-04-29] Sparkle appcast hosted as a GitHub release asset
+
+**Context**: Sparkle needs an `appcast.xml` URL and a place to host signed
+release artifacts. Choices: dedicated S3 / Cloudflare / static-host; a
+`gh-pages` branch on the repo; the GitHub release asset itself.
+
+**Decision**: appcast lives at
+`https://github.com/TaylorFinklea/layerkeys/releases/latest/download/appcast.xml`
+— uploaded as a release asset alongside `LayerKeys.zip` by the release
+workflow.
+
+**Alternatives considered**:
+- `gh-pages` branch (atomic with code; needs Pages plumbing).
+- Dedicated CDN (cost + ops surface for a free tool).
+
+**Rationale**: Zero infrastructure, atomic with releases (the appcast and
+the zip appear together when CI uploads), public + offline-cacheable, no
+Sparkle configuration to wrangle. Trade-off: the URL bakes in our project
+name; if we ever fork or rename, the cask needs republishing. Acceptable.
+
+## [2026-04-29] Launch-at-login: default off + one-shot first-launch prompt
+
+**Context**: Some macOS utilities default to "start at login" silently
+(power-user expectation); some never auto-start without explicit setup
+(least-surprise). Picking sides for LayerKeys.
+
+**Decision**: Default **off**. On first launch (gated by a
+`didShowLaunchAtLoginPrompt` UserDefaults flag, scheduled via a deferred
+main-actor `Task` from `AppModel.init`) show a single `NSAlert` with
+"Start at Login" / "Not Now". The toggle also lives in Settings → General
+so the user can flip it later either direction.
+
+**Alternatives considered**:
+- Default on with a Settings toggle to turn it off.
+- Default off, no prompt — discovery via Settings only.
+
+**Rationale**: A menu-bar app booting itself at login without asking
+violates "the user installed an app, that app should not now be a login
+item until they say so." Hiding the toggle behind Settings is the other
+failure mode: many users never visit Settings. The one-shot prompt at
+first launch is the cheapest discovery path and shown exactly once per
+user, ever.
+
+## [2026-04-29] M4a phase order: A (in-app) → B–F (signing/CI/release/docs)
+
+**Context**: M4a as originally written assumed all external prereqs were in
+place from day one. They weren't. At resumption: the Developer ID cert
+was the only one provisioned; the GitHub repo `TaylorFinklea/layerkeys`
+doesn't exist yet (the cask URL has been pointing at a 404 since 0.1.0);
+no Sparkle keypair; no notarytool credential. This will be LayerKeys's
+*first* public release, not an upgrade of an existing 0.1.0 install base.
+
+**Decision**: Reorder M4a as Phase A (pure in-app code, no external deps)
+→ B.1 (user-provisions notarytool credential) → B.2 (signing/notarization
+in script — testable locally with `SKIP_NOTARIZE=1`) → C (Sparkle keys,
+fully automatable from the Sparkle release tarball) → D (GitHub repo +
+secrets, user-collaborative) → E (cut 0.2.0) → F (README + handoff docs).
+
+**Alternatives considered**:
+- Front-load every prereq before any code (slower to demonstrate progress;
+  user has to provision multiple credentials before seeing anything).
+- Strict serial blocking on each prereq (serializes too much; nothing
+  ships until everything is in place).
+
+**Rationale**: Phase A delivers a meaningful, shippable, testable chunk
+(Sparkle wired, launch-at-login toggle, Settings General tab, +4 tests)
+without any external dependency. Phases B–F can interleave with user
+actions as credentials get provisioned. The plan's original
+M4a.1 → M4a.7 design intent is preserved — only execution sequence
+changes to fit reality.
+
+## [2026-04-29] Release script always builds unsigned, then signs explicitly
+
+**Context**: `package_release.sh` had to handle two environments: local
+(Dev ID cert in login keychain, ready to sign at build time) and CI (cert
+imported into a temp keychain by the workflow, only available *after*
+`xcodebuild` runs). Two natural shapes: tell xcodebuild to sign with
+Developer ID directly via `CODE_SIGN_STYLE=Manual` + `CODE_SIGN_IDENTITY`,
+or always build unsigned and sign explicitly with `codesign` post-build.
+
+**Decision**: Always build unsigned (`CODE_SIGNING_ALLOWED=NO`), then
+sign explicitly with `codesign --force --options runtime --timestamp
+--deep`. The same script runs locally and in CI; the only difference is
+how the keychain gets the cert.
+
+**Alternatives considered**: Tell xcodebuild to sign during build with
+`CODE_SIGN_STYLE=Manual` + Developer ID identity. Cleaner in some ways
+(Xcode handles recursive framework signing automatically), but couples
+the build step to the signing step, makes CI's "import cert *after*
+build" pattern impossible, and means `SKIP_CODESIGN=1` would require
+flipping a different lever.
+
+**Rationale**: One contract for both environments, simpler debugging
+(unsigned build is its own checkpoint), `--deep` handles Sparkle
+.framework's nested binaries (Autoupdate, XPCServices/*.xpc, Updater.app)
+correctly — verified locally via `SKIP_NOTARIZE=1 ./scripts/package_release.sh`
+with `codesign --verify --deep --strict` passing on the result. Two
+escape hatches keep dev workflows ergonomic: `SKIP_CODESIGN=1` for
+contributors without a Developer ID cert, `SKIP_NOTARIZE=1` for fast
+local iteration.

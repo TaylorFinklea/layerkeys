@@ -8,71 +8,103 @@
 
 ## Last Session Summary
 
-**Date**: 2026-04-20 (continuation of the same calendar-day session that
-shipped M2)
+**Date**: 2026-04-29
 
-- **Pre-M3 warmup**: extracted `EventTapEngine` + `EventTapStartup` (and
-  the new `TapLivenessProbe`) from `EventTapService.swift` into
-  `LayerKeys/EventTapEngine.swift`. Regenerated the Xcode project with
-  `xcodegen` so the new file is picked up. Marked the Sonnet-tier
-  backlog item `[x]`.
-- **Completed M3: Reliability & correctness pass** in three logical
-  substeps, all green at each checkpoint:
-  - **M3.1 (testable seam)**: added `EventAction` enum and
-    `LayerStateMachine.decide(...)` returning `EventDecision(action:,
-    modeDidChange:)`. `EventTapEngine.handle` now only dispatches the
-    decision to CGEvent side effects. 10 new `testDecide*` tests cover
-    synthetic-escape suppression, trigger-chord entry, wrong-modifier
-    rejection, quick-tap Escape, tap-to-Escape-off behavior, nav-remap,
-    numpad-remap, sub-trigger consumption, no-layer-active pass-through,
-    and unrelated-event-type pass-through.
-  - **M3.2 (sleep/wake recovery)**: new `SleepWakeHandler` value type +
-    `NSWorkspace.willSleepNotification` / `didWakeNotification`
-    observers on `EventTapService`. On wake, idempotently re-enables the
-    tap; if `CGEvent.tapIsEnabled` still returns false, falls back to
-    `stop()` + `start()`. Engine gained `reEnableTap()` and
-    `isTapAlive()` cross-thread helpers plus `TapLivenessProbe`. 4 new
-    `testSleepWake*` tests drive the handler directly with stubbed
-    closures.
-  - **M3.3 (CapsLock + flag-hygiene regression tests)**: promoted
-    `outputFlags(for:)` to `LayerStateMachine` so it's testable without
-    touching `CGEvent`. New tests:
-    `testCapsLockDuringHoldDoesNotSuppressTapToEscape`,
-    `testOutputFlagsAlwaysStripsMaskSecondaryFn`,
-    `testOutputFlagsStripsDefaultTriggerControlModifier`,
-    `testOutputFlagsStripsCustomModifierSet`,
-    `testOutputFlagsPreservesCapsLockAndShift`.
-  - **M3.4 (`Unmanaged` audit)**: after the seam refactor there is
-    exactly one `Unmanaged.passRetained(event)` site — the `.remap`
-    branch of `handle` — and it's the only mutation path. The ownership
-    contract is now obvious at a glance; no fixes needed. Findings
-    captured in `decisions.md` 2026-04-20 entry.
-- **Deferred**: non-US keyboard-layout glyph labels in Settings.
-  Originally an M3 sub-item; pushed to M4 polish (or later) per
-  `decisions.md` 2026-04-20.
-- `xcodebuild test` green: **47/47 passing** (28 pre-M3 + 19 new M3).
-  Zero compiler warnings.
-- Files touched this session:
-  - `LayerKeys/EventTapEngine.swift` *(new)*
-  - `LayerKeys/EventTapService.swift` (trimmed to the service +
-    `SleepWakeHandler`)
-  - `LayerKeys/LayerStateMachine.swift` (new `EventAction`,
-    `EventDecision`, `decide(...)`, `outputFlags(for:)`)
-  - `LayerKeysTests/LayerKeysTests.swift` (+19 tests)
-  - `LayerKeys.xcodeproj/project.pbxproj` (xcodegen-regenerated)
-  - `.docs/ai/roadmap.md`, `decisions.md`, `current-state.md`,
-    `next-steps.md`
+- **Resumption planning**: prior session's M4 plan needed reordering — the
+  original "Prerequisites (user-owned)" assumed all external creds (Dev ID
+  cert, notarytool credential, Sparkle keys, GitHub repo + secrets) were in
+  place. Reality: only the Dev ID cert was provisioned; the GitHub repo
+  doesn't exist yet (cask URL has been pointing at a 404 since 0.1.0). M4 was
+  split into M4a (release pipeline, ships 0.2.0) + M4b (1.0 polish, ships
+  1.0.0); M4a was reordered into Phase A (in-app code, fully unblocked) →
+  B–F (signing, Sparkle keys, GitHub bootstrap, release cut, docs). See the
+  resumption section at the top of `~/.claude/plans/plan-it-out-drifting-lantern.md`
+  and the corresponding ADRs in `decisions.md`.
+
+- **M4a Phase A** *(in-app code, no external deps)* — shipped in two commits:
+  - **A.1** (commit `59f0ef0` "Wire Sparkle 2.x updater"): added Sparkle 2.6.0
+    SPM dependency to `project.yml` (resolved to 2.9.1 in `Package.resolved`),
+    `SPUStandardUpdaterController` owned by `LayerKeysApp`, "Check for
+    Updates…" exposed as both a Settings command and a menu-bar dropdown
+    button. `SUPublicEDKey` was a placeholder pending Phase C.
+  - **A.2–A.4** (commit `750cbd2` "Wire launch-at-login + Settings General
+    tab"): TDD-built `LaunchAtLoginController` wrapping `SMAppService.mainApp`
+    behind a `LaunchAtLoginStore` protocol (4 new tests using a fileprivate
+    `StubLaunchAtLoginStore`); `AppModel` exposes `launchAtLoginEnabled` +
+    `toggleLaunchAtLogin()`, persists a `didShowLaunchAtLoginPrompt`
+    UserDefaults flag, and shows an `NSAlert` first-launch prompt via a
+    deferred main-actor `Task`; new "General" Settings tab carries the toggle
+    plus a Sparkle-update blurb.
+
+- **M4a Phase C** *(Sparkle EdDSA keypair)* — shipped (commit `18f449b`
+  "Install Sparkle EdDSA public key"). Downloaded
+  `Sparkle-2.9.1.tar.xz` from sparkle-project.org, ran `bin/generate_keys`,
+  installed the public key (`l2ghc9Y6kQcCddTEo6oRIJ2KL3rrE1ji/Xz+i9bme70=`)
+  in `info.properties` of `project.yml`. The matching private key is in the
+  user's macOS keychain (Sparkle stores it under
+  `https://sparkle-project.org` / `ed25519-private-key`). `xcodebuild test`
+  green; the expected "404 appcast" log from Sparkle on test run confirms
+  Sparkle is wired end-to-end (the appcast doesn't exist yet because the
+  GitHub repo isn't created — Phase D).
+
+- **M4a Phase B.2** *(release script signing/notarization)* — shipped
+  (commit `116a2e6` "Sign + notarize releases"). `scripts/package_release.sh`
+  rewritten to:
+  - Always build unsigned (CI parity), then sign explicitly post-build.
+  - Auto-detect the Developer ID Application identity from the keychain
+    (override via `DEVELOPER_ID` env var); fail fast if zero or multiple
+    matches.
+  - Sign with `codesign --force --options runtime --timestamp --deep
+    --sign "$DEVELOPER_ID"` (hardened runtime, required for notarization).
+  - `xcrun notarytool submit --wait` in dual-mode: keychain profile locally
+    (`NOTARY_KEYCHAIN_PROFILE` defaults to `layerkeys-notarytool`), Apple ID
+    env-var creds (`NOTARY_APPLE_ID` / `NOTARY_PASSWORD` / `NOTARY_TEAM_ID`)
+    in CI.
+  - `xcrun stapler staple` + re-zip + `stapler validate` + `spctl --assess`.
+  - Two escape hatches: `SKIP_CODESIGN=1` (unsigned) and `SKIP_NOTARIZE=1`
+    (sign without submitting).
+  - Local end-to-end validation: `SKIP_NOTARIZE=1 ./scripts/package_release.sh`
+    succeeded. `codesign -dv --verbose=4` reports `flags=0x10000(runtime)`,
+    universal binary (x86_64 + arm64), authority `Developer ID Application:
+    Taylor Finklea (K7CBQW6MPG)`. Sparkle.framework's nested binaries
+    (Autoupdate, XPCServices, Updater.app) signed correctly under `--deep`.
+    Notarization itself **not yet verified** — awaits Phase B.1.
+
+- **Files touched this session**:
+  - `project.yml` (Sparkle dep + SUPublicEDKey)
+  - `LayerKeys/LayerKeysApp.swift` (Sparkle wiring, CheckForUpdatesView)
+  - `LayerKeys/StatusMenuView.swift` (accepts updater + Check-for-Updates button)
+  - `LayerKeys/AppModel.swift` (launch-at-login state + first-launch prompt)
+  - `LayerKeys/SettingsView.swift` (General tab)
+  - `LayerKeys/LaunchAtLoginController.swift` *(new)*
+  - `LayerKeysTests/LayerKeysTests.swift` (+4 launch-at-login tests, +stub)
+  - `scripts/package_release.sh` (signing + notarization + stapling)
+  - `LayerKeys.xcodeproj/project.pbxproj` + `project.xcworkspace/.../Package.resolved` (xcodegen + SPM)
+  - `LayerKeys/Info.plist` (regenerated)
+  - `.docs/ai/roadmap.md`, `decisions.md`, `current-state.md`, `next-steps.md`
 
 ## Build Status
 
-- App: debug build succeeds; all 47 tests pass on this macOS host.
-- Release: still `0.1.0`. No release packaged this session — bump + cut
-  at the end of M4.
+- Tests: **51/51 green** (47 pre-M4a + 4 new `LaunchAtLoginController` tests).
+- Release script: signing path validated end-to-end locally via
+  `SKIP_NOTARIZE=1`. Notarization path code-complete but not yet exercised.
+- Release: still `0.1.0`. Bump to `0.2.0` happens in Phase E.
 
 ## Blockers
 
-- None. Next session plans M4 (notarized v1.0 + onboarding +
-  launch-at-login + Sparkle + polish). This is the biggest milestone
-  and has real external dependencies (Apple Developer ID cert
-  provisioning, `notarytool` keychain profile, Sparkle EdDSA key,
-  GitHub Action secrets). Expect the plan phase to front-load those.
+- **Phase B.1 needs you**: at appleid.apple.com generate an app-specific
+  password, then run
+  `xcrun notarytool store-credentials layerkeys-notarytool --apple-id <id> --team-id K7CBQW6MPG --password <app-specific-password>`.
+  After that, B.3 (a real notarized build) is one `./scripts/package_release.sh`
+  away.
+- **Phase D needs decisions**: should `TaylorFinklea/layerkeys` be public from
+  day one (probably yes — the cask URL is already public-facing)? Once the
+  repo exists, GitHub Actions secrets (cert .p12 base64, cert password,
+  notary creds, Sparkle private key) need provisioning before Phase E can
+  cut a real CI release.
+- **Visual smoke test deferred**: I haven't actually launched the debug app
+  to confirm the Settings "General" tab renders correctly, the first-launch
+  `NSAlert` fires from a deferred main-actor `Task`, and the menu-bar
+  Check-for-Updates button shows up. All compile cleanly and tests pass, but
+  UI feel hasn't been eyeballed. No system-state-changing prompts (Input
+  Monitoring, login-item registration) have been triggered.
