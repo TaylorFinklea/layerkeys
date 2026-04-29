@@ -29,7 +29,7 @@
 	<key>SUFeedURL</key>
 	<string>https://github.com/TaylorFinklea/layerkeys/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>REPLACE_AT_PHASE_C_WITH_REAL_EDDSA_PUBLIC_KEY</string>
+	<string>l2ghc9Y6kQcCddTEo6oRIJ2KL3rrE1ji/Xz+i9bme70=</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 </dict>

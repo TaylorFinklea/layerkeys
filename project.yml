@@ -35,10 +35,11 @@ targets:
         CFBundleVersion: "1"
         LSApplicationCategoryType: public.app-category.utilities
         LSUIElement: true
-        # Sparkle auto-update keys. SUPublicEDKey is a placeholder until M4a Phase C
-        # generates the real EdDSA keypair via Sparkle's `generate_keys`. Sparkle
-        # refuses unverifiable updates, so leaving the placeholder here is safe.
-        SUPublicEDKey: "REPLACE_AT_PHASE_C_WITH_REAL_EDDSA_PUBLIC_KEY"
+        # Sparkle auto-update keys. The matching EdDSA private key is stored in the
+        # release-builder's macOS keychain (added by Sparkle's `generate_keys`). For
+        # CI, the private key is fed to `generate_appcast` via the
+        # `SPARKLE_EDDSA_PRIVATE_KEY` GitHub secret.
+        SUPublicEDKey: "l2ghc9Y6kQcCddTEo6oRIJ2KL3rrE1ji/Xz+i9bme70="
         SUFeedURL: "https://github.com/TaylorFinklea/layerkeys/releases/latest/download/appcast.xml"
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
