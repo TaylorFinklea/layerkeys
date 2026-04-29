@@ -7,6 +7,10 @@ settings:
     SWIFT_VERSION: 6.0
     MARKETING_VERSION: 0.1.0
     CURRENT_PROJECT_VERSION: 1
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
 targets:
   LayerKeys:
     type: application
@@ -14,6 +18,8 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - path: LayerKeys
+    dependencies:
+      - package: Sparkle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.taylorfinklea.layerkeys
@@ -29,6 +35,13 @@ targets:
         CFBundleVersion: "1"
         LSApplicationCategoryType: public.app-category.utilities
         LSUIElement: true
+        # Sparkle auto-update keys. SUPublicEDKey is a placeholder until M4a Phase C
+        # generates the real EdDSA keypair via Sparkle's `generate_keys`. Sparkle
+        # refuses unverifiable updates, so leaving the placeholder here is safe.
+        SUPublicEDKey: "REPLACE_AT_PHASE_C_WITH_REAL_EDDSA_PUBLIC_KEY"
+        SUFeedURL: "https://github.com/TaylorFinklea/layerkeys/releases/latest/download/appcast.xml"
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
     scheme:
       gatherCoverageData: false
       testTargets:

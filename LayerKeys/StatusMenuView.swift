@@ -1,7 +1,9 @@
+import Sparkle
 import SwiftUI
 
 struct StatusMenuView: View {
     @ObservedObject var model: AppModel
+    let updater: SPUUpdater
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -54,6 +56,8 @@ struct StatusMenuView: View {
                 model.refreshPermissionState()
                 model.restartEventTap()
             }
+
+            CheckForUpdatesView(updater: updater)
 
             Button("Quit LayerKeys") {
                 model.quit()
