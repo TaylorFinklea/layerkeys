@@ -15,6 +15,11 @@ struct SettingsView: View {
                     Label("Triggers", systemImage: "hand.tap")
                 }
 
+            generalView
+                .tabItem {
+                    Label("General", systemImage: "gearshape")
+                }
+
             permissionsView
                 .tabItem {
                     Label("Permissions", systemImage: "lock.shield")
@@ -155,6 +160,38 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var generalView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("General")
+                .font(.title2.weight(.semibold))
+
+            Form {
+                Section("Startup") {
+                    Toggle(
+                        "Start LayerKeys at login",
+                        isOn: Binding(
+                            get: { model.launchAtLoginEnabled },
+                            set: { model.setLaunchAtLogin($0) }
+                        )
+                    )
+
+                    Text("LayerKeys will register itself as a login item via macOS Service Management. You can also remove it from System Settings → General → Login Items.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Updates") {
+                    Text("LayerKeys checks for new releases automatically once a day and prompts you when one is available. Use the menu-bar Check for Updates… button to check manually.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .formStyle(.grouped)
+
+            Spacer()
         }
     }
 

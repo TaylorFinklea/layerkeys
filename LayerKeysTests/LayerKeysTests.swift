@@ -1,3 +1,4 @@
+import ServiceManagement
 import XCTest
 @testable import LayerKeys
 
@@ -683,5 +684,80 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertTrue(cleaned.contains(.maskAlphaShift))
         XCTAssertTrue(cleaned.contains(.maskShift))
         XCTAssertFalse(cleaned.contains(.maskControl))
+    }
+
+    // MARK: - LaunchAtLoginController (M4a Phase A.2)
+
+    @MainActor
+    func testLaunchControllerReportsEnabledWhenStoreIsEnabled() {
+        let store = StubLaunchAtLoginStore(initialStatus: .enabled)
+        let controller = LaunchAtLoginController(store: store)
+
+        XCTAssertTrue(controller.isEnabled)
+
+        store.statusValue = .notRegistered
+        XCTAssertFalse(controller.isEnabled)
+    }
+
+    @MainActor
+    func testLaunchControllerRegistersWhenEnabled() throws {
+        let store = StubLaunchAtLoginStore()
+        let controller = LaunchAtLoginController(store: store)
+
+        try controller.setEnabled(true)
+
+        XCTAssertEqual(store.registerCallCount, 1)
+        XCTAssertEqual(store.unregisterCallCount, 0)
+        XCTAssertTrue(controller.isEnabled)
+    }
+
+    @MainActor
+    func testLaunchControllerUnregistersWhenDisabled() throws {
+        let store = StubLaunchAtLoginStore(initialStatus: .enabled)
+        let controller = LaunchAtLoginController(store: store)
+
+        try controller.setEnabled(false)
+
+        XCTAssertEqual(store.unregisterCallCount, 1)
+        XCTAssertEqual(store.registerCallCount, 0)
+        XCTAssertFalse(controller.isEnabled)
+    }
+
+    @MainActor
+    func testLaunchControllerSurfacesStoreErrors() {
+        struct StoreFailure: Error {}
+        let store = StubLaunchAtLoginStore()
+        store.registerError = StoreFailure()
+        let controller = LaunchAtLoginController(store: store)
+
+        XCTAssertThrowsError(try controller.setEnabled(true)) { error in
+            XCTAssertTrue(error is StoreFailure)
+        }
+    }
+}
+
+private final class StubLaunchAtLoginStore: LaunchAtLoginStore {
+    var statusValue: SMAppService.Status
+    var registerError: Error?
+    var unregisterError: Error?
+    var registerCallCount = 0
+    var unregisterCallCount = 0
+
+    init(initialStatus: SMAppService.Status = .notRegistered) {
+        self.statusValue = initialStatus
+    }
+
+    var status: SMAppService.Status { statusValue }
+
+    func register() throws {
+        registerCallCount += 1
+        if let registerError { throw registerError }
+        statusValue = .enabled
+    }
+
+    func unregister() throws {
+        unregisterCallCount += 1
+        if let unregisterError { throw unregisterError }
+        statusValue = .notRegistered
     }
 }

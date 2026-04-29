@@ -8,21 +8,33 @@ final class AppModel: ObservableObject {
     @Published var permissionState: InputMonitoringPermissionState
     @Published var mappingProfile: MappingProfile
     @Published var lastError: String?
+    @Published private(set) var launchAtLoginEnabled: Bool
 
     private let mappingStore: MappingStore
     private let eventTapService: EventTapService
+    private let launchAtLoginController: LaunchAtLoginController
+    private let userDefaults: UserDefaults
+
+    static let didShowLaunchAtLoginPromptKey = "didShowLaunchAtLoginPrompt"
 
     init(
         mappingStore: MappingStore = .shared,
-        eventTapService: EventTapService? = nil
+        eventTapService: EventTapService? = nil,
+        launchAtLoginController: LaunchAtLoginController? = nil,
+        userDefaults: UserDefaults = .standard
     ) {
         self.mappingStore = mappingStore
+        self.userDefaults = userDefaults
         let profile = mappingStore.load()
         mappingProfile = profile
         permissionState = PermissionController.currentState()
 
         let service = eventTapService ?? EventTapService(profile: profile)
         self.eventTapService = service
+
+        let controller = launchAtLoginController ?? LaunchAtLoginController()
+        self.launchAtLoginController = controller
+        launchAtLoginEnabled = controller.isEnabled
 
         service.onModeChange = { [weak self] mode in
             Task { @MainActor in
@@ -40,6 +52,51 @@ final class AppModel: ObservableObject {
                 lastError = "LayerKeys could not start the global event tap."
             }
         }
+
+        if !didShowLaunchAtLoginPrompt {
+            Task { @MainActor [weak self] in
+                self?.showLaunchAtLoginPromptIfNeeded()
+            }
+        }
+    }
+
+    func showLaunchAtLoginPromptIfNeeded() {
+        guard !didShowLaunchAtLoginPrompt else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Start LayerKeys at login?"
+        alert.informativeText = "Run LayerKeys automatically when you sign in. You can change this anytime in Settings → General."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Start at Login")
+        alert.addButton(withTitle: "Not Now")
+
+        let response = alert.runModal()
+        markLaunchAtLoginPromptShown()
+        if response == .alertFirstButtonReturn {
+            setLaunchAtLogin(true)
+        }
+    }
+
+    var didShowLaunchAtLoginPrompt: Bool {
+        userDefaults.bool(forKey: Self.didShowLaunchAtLoginPromptKey)
+    }
+
+    func markLaunchAtLoginPromptShown() {
+        userDefaults.set(true, forKey: Self.didShowLaunchAtLoginPromptKey)
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            try launchAtLoginController.setEnabled(enabled)
+            launchAtLoginEnabled = launchAtLoginController.isEnabled
+            lastError = nil
+        } catch {
+            lastError = "Couldn't change launch-at-login: \(error.localizedDescription)"
+        }
+    }
+
+    func toggleLaunchAtLogin() {
+        setLaunchAtLogin(!launchAtLoginEnabled)
     }
 
     func requestPermission() {
