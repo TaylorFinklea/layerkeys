@@ -22,11 +22,7 @@ Install from the Homebrew tap:
 brew install --cask TaylorFinklea/tap/layerkeys
 ```
 
-If Gatekeeper blocks launch because the app is not notarized yet:
-
-```bash
-xattr -dr com.apple.quarantine "/Applications/LayerKeys.app"
-```
+The cask installs a Developer-ID-signed and Apple-notarized build, so macOS opens it without a Gatekeeper prompt. After install, LayerKeys auto-updates via Sparkle — new versions show up in-app under **Check for Updates…** (menu bar dropdown and Settings → General).
 
 ## Permissions
 
@@ -71,18 +67,17 @@ That rewrites the cask in the sibling tap repo at `../homebrew-tap`.
 
 ### GitHub release
 
-The repo includes a GitHub Actions workflow that builds `LayerKeys.zip` on every `v*` tag and uploads it to a GitHub release. The Homebrew cask is written to expect this asset URL:
+The repo includes a GitHub Actions workflow that, on every `v*` tag, runs the test suite, signs + notarizes `LayerKeys.app`, generates a Sparkle `appcast.xml`, and uploads both artifacts to the GitHub release. The Homebrew cask expects:
 
 `https://github.com/TaylorFinklea/layerkeys/releases/download/v<version>/LayerKeys.zip`
+
+…and Sparkle pulls the appcast from `releases/latest/download/appcast.xml`.
 
 Suggested release flow:
 
 1. Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`.
-2. Run `./scripts/package_release.sh`.
-3. Run `./scripts/update_homebrew_tap.sh`.
-4. Commit both repos.
-5. Tag the app repo with `v<version>`.
-6. Push the app repo, tag, and tap repo.
+2. Commit, tag the app repo with `v<version>`, push the tag → CI cuts the release.
+3. Run `./scripts/update_homebrew_tap.sh` once the release is published, then commit and push the tap repo.
 
 ## Project status
 
