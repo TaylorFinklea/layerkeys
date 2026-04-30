@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Repository Agent Instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Project-specific guidance for any AI coding agent (Claude Code, Codex, Copilot, Opencode, etc.) working in this repository. Shared agent behavior lives in `~/AGENTS.md`.
 
 ## Build, test, and release commands
 

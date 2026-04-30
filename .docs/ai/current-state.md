@@ -81,7 +81,7 @@
   - `scripts/package_release.sh` (signing + notarization + stapling)
   - `LayerKeys.xcodeproj/project.pbxproj` + `project.xcworkspace/.../Package.resolved` (xcodegen + SPM)
   - `LayerKeys/Info.plist` (regenerated)
-  - `.docs/ai/roadmap.md`, `decisions.md`, `current-state.md`, `next-steps.md`
+  - `.docs/ai/roadmap.md`, `decisions.md`, `current-state.md`
 
 ## Build Status
 
