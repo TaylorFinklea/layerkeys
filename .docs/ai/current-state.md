@@ -8,6 +8,25 @@
 
 ## Last Session Summary
 
+**Date**: 2026-04-30
+
+- **M4a Phase D.3 + F.1** — README install section dropped the `xattr -dr`
+  workaround and now points at "Check for Updates…" / Sparkle for in-app
+  updates; release-workflow section rewritten to reflect that CI does the
+  signing + notarization. `.github/workflows/release.yml` rewritten to:
+  cert-import-from-secrets into a temp keychain (search-list-prepended
+  so timestamp service still resolves), run `package_release.sh` with
+  the `NOTARY_*` env vars wired to GitHub secrets, fetch a pinned
+  `Sparkle-2.9.1.tar.xz` and run `generate_appcast` against `dist/`
+  with the EdDSA private key sourced from `SPARKLE_EDDSA_PRIVATE_KEY`,
+  upload both `LayerKeys.zip` and `appcast.xml` as release assets. All
+  shell interpolations of GitHub-context values are routed through
+  `env:` blocks (no direct `${{ }}` in `run:` for any field that could
+  carry attacker-controlled input).
+  *Not exercised in CI yet* — first real run is gated on D.1 (repo
+  create) + D.2 (secret provisioning). The `generate_appcast` flag set
+  is best-effort; expect to iterate after the first run.
+
 **Date**: 2026-04-29
 
 - **Resumption planning**: prior session's M4 plan needed reordering — the
