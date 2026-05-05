@@ -8,6 +8,25 @@
 
 ## Last Session Summary
 
+**Date**: 2026-05-05
+
+- **M4a Phase B.3 — pipeline validated end-to-end.** User completed B.1
+  (notarytool keychain profile `layerkeys-notarytool` provisioned).
+  Ran `./scripts/package_release.sh` against the current `main`
+  (still 0.1.0 — version bump is Phase E). Submission
+  `ebfa983a-3402-4c4a-8f3b-d19233a33f13` accepted by Apple's notary
+  service after ~1 minute of "In Progress" → "Accepted". `stapler`
+  staple + validate worked; `spctl --assess --type execute --verbose=2`
+  reports `accepted` / `source=Notarized Developer ID`. Universal
+  binary signed with `Developer ID Application: Taylor Finklea
+  (K7CBQW6MPG)`; Sparkle.framework's nested binaries (Autoupdate,
+  Updater.app, Downloader.xpc, Installer.xpc) all `--prepared` →
+  `--validated` under `--deep`. Final artifact:
+  `dist/LayerKeys.zip` sha256
+  `17190ae34f3a1476a1147d221e3772bae79ca5dc13d170ef95b4f521e79a4de1`.
+  No code changes this session — the script written in B.2 just got
+  its first real notarization round-trip.
+
 **Date**: 2026-04-30
 
 - **M4a Phase D.3 + F.1** — README install section dropped the `xattr -dr`
@@ -111,16 +130,14 @@
 
 ## Blockers
 
-- **Phase B.1 needs you**: at appleid.apple.com generate an app-specific
-  password, then run
-  `xcrun notarytool store-credentials layerkeys-notarytool --apple-id <id> --team-id K7CBQW6MPG --password <app-specific-password>`.
-  After that, B.3 (a real notarized build) is one `./scripts/package_release.sh`
-  away.
-- **Phase D needs decisions**: should `TaylorFinklea/layerkeys` be public from
-  day one (probably yes — the cask URL is already public-facing)? Once the
-  repo exists, GitHub Actions secrets (cert .p12 base64, cert password,
-  notary creds, Sparkle private key) need provisioning before Phase E can
-  cut a real CI release.
+- **Phase D.1 needs you**: should `TaylorFinklea/layerkeys` be public from
+  day one (probably yes — the cask URL is already public-facing)? Then
+  `gh repo create TaylorFinklea/layerkeys --public --source . --push`.
+- **Phase D.2 needs you**: once the repo exists, provision GitHub Actions
+  secrets (`APPLE_DEVID_CERT_P12_BASE64`, `APPLE_DEVID_CERT_PASSWORD`,
+  `NOTARY_APPLE_ID`, `NOTARY_PASSWORD`, `NOTARY_TEAM_ID`,
+  `SPARKLE_EDDSA_PRIVATE_KEY`) via `gh secret set`. Specific commands
+  in `roadmap.md` Now/Next/Later → Now.
 - **Visual smoke test deferred**: I haven't actually launched the debug app
   to confirm the Settings "General" tab renders correctly, the first-launch
   `NSAlert` fires from a deferred main-actor `Task`, and the menu-bar

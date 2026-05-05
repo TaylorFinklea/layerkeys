@@ -18,13 +18,11 @@ reliability, and zero-friction install are the long-term differentiators.
 Active items. Trim as completed.
 
 ### Now
-- **M4a Phase B.1** *(user action)* — at appleid.apple.com generate an app-specific password labeled `layerkeys-notarytool`. Then run `xcrun notarytool store-credentials layerkeys-notarytool --apple-id <your-apple-id> --team-id K7CBQW6MPG --password <app-specific-password>`. Unblocks Phase B.3 (real notarized local build) and Phase D.2 (same creds as GitHub Actions secrets).
-- **M4a Phase B.3** — after B.1, run `./scripts/package_release.sh` end-to-end and confirm `xcrun stapler validate` + `spctl --assess --type execute -vv` both show "accepted" and "notarized". This is the real verification that the signing path works for distribution.
+- **M4a Phase D.1** *(user action / decision)* — `gh repo create TaylorFinklea/layerkeys --public --source . --push`. The cask URL is already public-facing, so the default is public-from-day-one; confirm before running. Without the repo on GitHub, Phase E can't tag a release that CI can pick up.
+- **M4a Phase D.2** *(user action)* — once the repo exists, provision GitHub Actions secrets via `gh secret set`: `APPLE_DEVID_CERT_P12_BASE64` (`security export -k login.keychain -t identities -f pkcs12 -o /tmp/cert.p12 ...` → `base64 < /tmp/cert.p12`), `APPLE_DEVID_CERT_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_PASSWORD` (the same app-specific password from B.1), `NOTARY_TEAM_ID=K7CBQW6MPG`, `SPARKLE_EDDSA_PRIVATE_KEY` (`generate_keys -x -` from a Sparkle 2.x release tarball).
 
 ### Next
-- **M4a Phase D.1** — `gh repo create TaylorFinklea/layerkeys --public --source . --push`. (Decision: probably public from day one because the cask URL is already public-facing. Confirm before running.)
-- **M4a Phase D.2** — provision GitHub Actions secrets via `gh secret set`: `APPLE_DEVID_CERT_P12_BASE64` (`security export -k login.keychain -t identities -f pkcs12 ...` → `base64`), `APPLE_DEVID_CERT_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_PASSWORD`, `NOTARY_TEAM_ID=K7CBQW6MPG`, `SPARKLE_EDDSA_PRIVATE_KEY` (`/tmp/sparkle-cli/bin/generate_keys -x -`).
-- **M4a Phase E** — bump `MARKETING_VERSION` to `0.2.0`, regenerate xcodeproj, commit, tag `v0.2.0`, push tag, watch CI, run `./scripts/update_homebrew_tap.sh` and push the tap repo. (Phase D.3 release.yml + Phase F.1 README updates already merged on `main`; secrets in D.2 are still the only thing the CI run needs.)
+- **M4a Phase E** — bump `MARKETING_VERSION` to `0.2.0`, regenerate xcodeproj, commit, tag `v0.2.0`, push tag, watch CI run `release.yml` end-to-end, then run `./scripts/update_homebrew_tap.sh` and push the tap repo. The first CI run is the unproven part — if `generate_appcast` flags need iteration, that lands here.
 - Visual smoke test of Phase A (Settings "General" tab, first-launch prompt, Check-for-Updates button) — open a debug build manually before tagging `v0.2.0`. Don't let CI ship a UI you've never seen.
 
 ### Later
@@ -102,8 +100,8 @@ to verify the pipeline independently of UX work).
 **Phase B — Developer ID signing + notarization:**
 
 - [x] **B.2**: `scripts/package_release.sh` always builds unsigned then signs with `codesign --options runtime --timestamp --deep --sign "$DEVELOPER_ID"`; submits via `xcrun notarytool submit --wait` (auto-picks keychain-profile vs Apple-ID-env-var auth); staples ticket; re-zips; verifies with `stapler validate` + `spctl --assess`. Local sign+verify path validated end-to-end (signed app passes `codesign --verify --deep --strict`); notarization itself awaits B.1 (commit `116a2e6`).
-- [ ] **B.1** *(user action)*: `xcrun notarytool store-credentials layerkeys-notarytool --apple-id <id> --team-id K7CBQW6MPG --password <app-specific-password>` after generating an app-specific password at appleid.apple.com.
-- [ ] **B.3**: run `./scripts/package_release.sh` end-to-end and confirm `xcrun stapler validate` + `spctl --assess --type execute -vv` both report "accepted" + "notarized".
+- [x] **B.1**: notarytool keychain profile `layerkeys-notarytool` provisioned by user (2026-05-05).
+- [x] **B.3**: end-to-end `./scripts/package_release.sh` run validated 2026-05-05. Notary submission `ebfa983a-3402-4c4a-8f3b-d19233a33f13` accepted; `stapler validate` + `spctl --assess` both report "accepted" / `source=Notarized Developer ID`. Local pipeline is fully exercised — the only remaining gating step on a tag-driven 0.2.0 is GitHub-side (Phase D).
 
 **Phase D — GitHub repo + CI secrets:**
 
