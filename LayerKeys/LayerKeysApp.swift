@@ -3,12 +3,21 @@ import SwiftUI
 
 @main
 struct LayerKeysApp: App {
-    @StateObject private var model = AppModel()
-    private let updaterController = SPUStandardUpdaterController(
-        startingUpdater: true,
-        updaterDelegate: nil,
-        userDriverDelegate: nil
-    )
+    @StateObject private var model: AppModel
+    private let updaterController: SPUStandardUpdaterController
+
+    init() {
+        // Construct in init() rather than as default values so Swift 6.1
+        // (Xcode 16.4) doesn't crash in `silgen emitStoredPropertyInitialization`
+        // when @StateObject's wrappedValue autoclosure tries to call the
+        // @MainActor-isolated AppModel.init.
+        _model = StateObject(wrappedValue: AppModel())
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
+    }
 
     var body: some Scene {
         MenuBarExtra {
