@@ -53,11 +53,20 @@ final class AppModel: ObservableObject {
             }
         }
 
-        if !didShowLaunchAtLoginPrompt {
+        if !didShowLaunchAtLoginPrompt && !Self.isRunningUnderXCTest {
             Task { @MainActor [weak self] in
                 self?.showLaunchAtLoginPromptIfNeeded()
             }
         }
+    }
+
+    /// True when the host process is the XCTest runner. We skip the
+    /// first-launch NSAlert in that case because `runModal()` blocks the host
+    /// app's run loop, which makes the test runner time out before it can
+    /// start executing tests on a fresh CI runner where
+    /// `didShowLaunchAtLoginPrompt` is still false.
+    private static var isRunningUnderXCTest: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
     func showLaunchAtLoginPromptIfNeeded() {
