@@ -8,6 +8,58 @@
 
 ## Last Session Summary
 
+**Date**: 2026-05-05 (afternoon — Phase D + E)
+
+- **M4a Phase D shipped end-to-end.** `gh repo create
+  TaylorFinklea/layerkeys --public --source . --push` (D.1); user
+  provisioned all six GitHub Actions secrets (D.2): cert .p12 + password,
+  notary Apple-ID + app-specific password + team ID, Sparkle EdDSA
+  private key. `gh secret list` confirmed all 6 names. (Sparkle private
+  key initially landed in `./-` because `generate_keys -x -` writes to a
+  literal file named `-` rather than stdout — caught and re-set the
+  secret from the file before deletion. Worth remembering for future
+  Sparkle work.)
+
+- **M4a Phase E shipped 0.2.0.** Three commits and one tag fight:
+  - `8a16cc3` "Bump version to 0.2.0" — `MARKETING_VERSION` 0.1.0 → 0.2.0,
+    `CURRENT_PROJECT_VERSION` 1 → 2, mirrored into `Info.plist`.
+  - `ca94785` "Build LayerKeysApp on Swift 6.1.2 (Xcode 16.4)" — CI
+    runner crashed in `silgen emitStoredPropertyInitialization` for
+    `@StateObject private var model = AppModel()` because Swift 6.1.2's
+    `@StateObject` autoclosure can't inherit `@MainActor` isolation when
+    `AppModel.init` is `@MainActor`. Local Swift 6.2+ tolerates the
+    pattern. Fix: move both stored-property initializations into an
+    explicit `App.init()` where actor isolation is unambiguous.
+  - `fa563f6` "Skip first-launch NSAlert under XCTest" — CI test runner
+    timed out with "Test runner never began executing tests after
+    launching" because LayerKeys.app launches as the test host, then
+    AppModel's deferred Task fires `NSAlert.runModal()` which blocks the
+    run loop on a fresh runner where `didShowLaunchAtLoginPrompt` is
+    still false. Fix: skip the prompt when
+    `XCTestConfigurationFilePath` env var is set.
+  - Tag `v0.2.0` was moved twice (origin tag deleted + recreated) so
+    that the published tag points at `fa563f6`. CI run `25397167560`
+    succeeded in 1m56s — Apple notary returned Accepted in 23 seconds.
+  - Release published with `LayerKeys.zip` sha256
+    `8665e5595c2dde2a981adb7790346af96e2e12380db3f60a9e4c07046489d7cc`
+    and `appcast.xml`.
+
+- **Tap repo updated.** `TaylorFinklea/homebrew-tap@2831a88` "Add
+  LayerKeys cask v0.2.0". The local tap repo had diverged from origin
+  (1 stale local commit re-adding the 0.1.0 cask, 5 newer commits on
+  origin); resolved by `git rebase origin/main` (clean, no conflicts)
+  then amended the rebased commit to carry the 0.2.0 update. `brew
+  fetch --cask TaylorFinklea/tap/layerkeys` resolved + verified the
+  sha256 against the published GitHub asset.
+
+- **Files touched this session**:
+  - `LayerKeys/LayerKeysApp.swift` (explicit init for Swift 6.1.2)
+  - `LayerKeys/AppModel.swift` (XCTest guard around first-launch prompt)
+  - `project.yml` + `LayerKeys.xcodeproj/project.pbxproj` +
+    `LayerKeys/Info.plist` (version 0.2.0)
+  - `.docs/ai/roadmap.md`, `current-state.md`
+  - `../homebrew-tap/Casks/layerkeys.rb` (0.2.0 + new sha256)
+
 **Date**: 2026-05-05
 
 - **M4a Phase B.3 — pipeline validated end-to-end.** User completed B.1
@@ -130,14 +182,12 @@
 
 ## Blockers
 
-- **Phase D.1 needs you**: should `TaylorFinklea/layerkeys` be public from
-  day one (probably yes — the cask URL is already public-facing)? Then
-  `gh repo create TaylorFinklea/layerkeys --public --source . --push`.
-- **Phase D.2 needs you**: once the repo exists, provision GitHub Actions
-  secrets (`APPLE_DEVID_CERT_P12_BASE64`, `APPLE_DEVID_CERT_PASSWORD`,
-  `NOTARY_APPLE_ID`, `NOTARY_PASSWORD`, `NOTARY_TEAM_ID`,
-  `SPARKLE_EDDSA_PRIVATE_KEY`) via `gh secret set`. Specific commands
-  in `roadmap.md` Now/Next/Later → Now.
+- **Phase E.4 (end-user smoke test) needs you**: `brew install --cask
+  TaylorFinklea/tap/layerkeys` on a setup that's never run LayerKeys
+  before. Confirm: app opens with no Gatekeeper dialog, first-launch
+  "Start LayerKeys at login?" alert appears once, menu-bar
+  Check-for-Updates button is reachable. After this, M4a is fully
+  closed and M4b can begin.
 - **Visual smoke test deferred**: I haven't actually launched the debug app
   to confirm the Settings "General" tab renders correctly, the first-launch
   `NSAlert` fires from a deferred main-actor `Task`, and the menu-bar

@@ -18,12 +18,11 @@ reliability, and zero-friction install are the long-term differentiators.
 Active items. Trim as completed.
 
 ### Now
-- **M4a Phase D.1** *(user action / decision)* — `gh repo create TaylorFinklea/layerkeys --public --source . --push`. The cask URL is already public-facing, so the default is public-from-day-one; confirm before running. Without the repo on GitHub, Phase E can't tag a release that CI can pick up.
-- **M4a Phase D.2** *(user action)* — once the repo exists, provision GitHub Actions secrets via `gh secret set`: `APPLE_DEVID_CERT_P12_BASE64` (`security export -k login.keychain -t identities -f pkcs12 -o /tmp/cert.p12 ...` → `base64 < /tmp/cert.p12`), `APPLE_DEVID_CERT_PASSWORD`, `NOTARY_APPLE_ID`, `NOTARY_PASSWORD` (the same app-specific password from B.1), `NOTARY_TEAM_ID=K7CBQW6MPG`, `SPARKLE_EDDSA_PRIVATE_KEY` (`generate_keys -x -` from a Sparkle 2.x release tarball).
+- **M4a Phase E.4** *(user action)* — `brew install --cask TaylorFinklea/tap/layerkeys` on a setup that's never run LayerKeys before. Confirm the app opens with no Gatekeeper dialog and the first-launch "Start LayerKeys at login?" prompt appears exactly once. This is the only test left in the M4a definition that requires real macOS UI.
 
 ### Next
-- **M4a Phase E** — bump `MARKETING_VERSION` to `0.2.0`, regenerate xcodeproj, commit, tag `v0.2.0`, push tag, watch CI run `release.yml` end-to-end, then run `./scripts/update_homebrew_tap.sh` and push the tap repo. The first CI run is the unproven part — if `generate_appcast` flags need iteration, that lands here.
-- Visual smoke test of Phase A (Settings "General" tab, first-launch prompt, Check-for-Updates button) — open a debug build manually before tagging `v0.2.0`. Don't let CI ship a UI you've never seen.
+- **M4b kickoff** — first-run onboarding wizard, conflict warnings in binding editor, hand-designed app icon refresh, marketing pass, non-US keyboard-layout glyph labels, then version bump to 1.0.0. See M4b list in this file.
+- Visual smoke test of Phase A's still-unverified UI bits (Settings "General" tab, menu-bar Check-for-Updates button) — useful to catch any regressions before M4b changes touch them.
 
 ### Later
 - Backlog Sonnet-tier: extract the duplicated `add/remove/update*Binding` methods in `AppModel` into a generic over a `WritableKeyPath`. Good pre-M4b warmup once 0.2.0 is out.
@@ -111,10 +110,10 @@ to verify the pipeline independently of UX work).
 
 **Phase E — cut 0.2.0:**
 
-- [ ] Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` to `0.2.0` in `project.yml`; regenerate xcodeproj.
-- [ ] Tag `v0.2.0`; push tag; CI runs end-to-end and publishes the release.
-- [ ] `./scripts/update_homebrew_tap.sh` rewrites the cask sha + version; commit + push the tap repo.
-- [ ] Smoke test: `brew install --cask TaylorFinklea/tap/layerkeys` on a fresh setup; app opens with no Gatekeeper dialog; first-launch prompt appears once.
+- [x] **E.1**: bumped `MARKETING_VERSION` 0.1.0→0.2.0 + `CURRENT_PROJECT_VERSION` 1→2; xcodeproj regenerated (commits `8a16cc3`, `ca94785`, `fa563f6` — version bump + two CI fixes).
+- [x] **E.2**: `v0.2.0` tag → CI run `25397167560` → release published 2026-05-05 with `LayerKeys.zip` (sha256 `8665e5595c2dde2a981adb7790346af96e2e12380db3f60a9e4c07046489d7cc`) and `appcast.xml`. Notarization confirmed in CI: `source=Notarized Developer ID`.
+- [x] **E.3**: tap repo updated and pushed (`TaylorFinklea/homebrew-tap@2831a88` "Add LayerKeys cask v0.2.0"); `brew fetch --cask` resolves and sha256 verifies clean.
+- [ ] **E.4**: end-user smoke test — `brew install --cask TaylorFinklea/tap/layerkeys` on a setup that's never opened LayerKeys before; app opens with no Gatekeeper dialog; first-launch prompt appears once. *(Pending user action.)*
 
 **Phase F — README + docs:**
 
