@@ -1025,6 +1025,22 @@ final class LayerKeysTests: XCTestCase {
         renderer.scale = 2.0
         XCTAssertNotNil(renderer.nsImage)
     }
+
+    @MainActor
+    func testMenuBarIconViewDeniedRenders() {
+        let view = MenuBarIconView(variant: .denied, updateBadge: false).frame(width: 18, height: 18)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2.0
+        XCTAssertNotNil(renderer.nsImage)
+    }
+
+    @MainActor
+    func testMenuBarIconViewListenOnlyRenders() {
+        let view = MenuBarIconView(variant: .listenOnly, updateBadge: false).frame(width: 18, height: 18)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2.0
+        XCTAssertNotNil(renderer.nsImage)
+    }
 }
 
 private final class StubLaunchAtLoginStore: LaunchAtLoginStore {

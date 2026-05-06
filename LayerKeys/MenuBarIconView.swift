@@ -104,8 +104,33 @@ struct MenuBarIconView: View {
             }
             ctx.fill(grid, with: .foreground)
 
-        case .denied, .listenOnly, .error:
-            break  // Filled in by Tasks 8-9.
+        case .denied:
+            // Diagonal slash from (5,6) to (19,18) at stroke-width 2.5.
+            // Cap shell is already drawn (and tinted .orange via foregroundStyle);
+            // the slash composes on top in the same color.
+            let slash = Path { p in
+                p.move(to: CGPoint(x: 5, y: 6))
+                p.addLine(to: CGPoint(x: 19, y: 18))
+            }
+            ctx.stroke(slash, with: .foreground, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+
+        case .listenOnly:
+            // Six explicit dash segments, three per row, mathematically
+            // centered around x=12. y rows at 14.5 and 17.
+            let dashStroke = StrokeStyle(lineWidth: 1.7, lineCap: .round)
+            let segments = Path { p in
+                let xs: [(CGFloat, CGFloat)] = [(6, 8), (11, 13), (16, 18)]
+                for y in [CGFloat(14.5), CGFloat(17)] {
+                    for (x1, x2) in xs {
+                        p.move(to: CGPoint(x: x1, y: y))
+                        p.addLine(to: CGPoint(x: x2, y: y))
+                    }
+                }
+            }
+            ctx.stroke(segments, with: .foreground, style: dashStroke)
+
+        case .error:
+            break  // Filled in by Task 9.
         }
     }
 
