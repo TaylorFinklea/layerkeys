@@ -27,12 +27,11 @@ struct LayerKeysApp: App {
         MenuBarExtra {
             StatusMenuView(model: model, updater: updaterController.updater)
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: model.permissionState.isGranted ? model.mode.symbolName : "exclamationmark.triangle.fill")
-                Text(model.mode.menuBarLabel)
-                    .monospacedDigit()
-            }
-            .foregroundStyle(model.permissionState.isGranted ? Color.primary : .orange)
+            MenuBarIconView(
+                variant: model.menuBarVariant.variant,
+                updateBadge: model.menuBarVariant.badge
+            )
+            .frame(width: 18, height: 18)
         }
         .menuBarExtraStyle(.window)
 

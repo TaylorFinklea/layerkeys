@@ -278,27 +278,6 @@ enum LayerMode: String, Codable, CaseIterable {
         }
     }
 
-    var menuBarLabel: String {
-        switch self {
-        case .off:
-            return "LK"
-        case .nav:
-            return "NAV"
-        case .numpad:
-            return "NUM"
-        }
-    }
-
-    var symbolName: String {
-        switch self {
-        case .off:
-            return "circle"
-        case .nav:
-            return "arrow.up.left.and.arrow.down.right"
-        case .numpad:
-            return "number.square"
-        }
-    }
 }
 
 struct NavigationBinding: Identifiable, Codable, Hashable {
