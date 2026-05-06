@@ -1,4 +1,5 @@
 import ServiceManagement
+import SwiftUI
 import XCTest
 @testable import LayerKeys
 
@@ -973,6 +974,40 @@ final class LayerKeysTests: XCTestCase {
 
         XCTAssertEqual(model.menuBarVariant.variant, .off)
         XCTAssertTrue(model.menuBarVariant.badge)
+    }
+
+    // MARK: - MenuBarIconView.Variant data
+
+    func testVariantTintColors() {
+        XCTAssertEqual(MenuBarIconView.Variant.off.tint,        .primary)
+        XCTAssertEqual(MenuBarIconView.Variant.nav.tint,        .primary)
+        XCTAssertEqual(MenuBarIconView.Variant.numpad.tint,     .primary)
+        XCTAssertEqual(MenuBarIconView.Variant.listenOnly.tint, .primary)
+        XCTAssertEqual(MenuBarIconView.Variant.denied.tint,     .orange)
+        XCTAssertEqual(MenuBarIconView.Variant.error.tint,      .red)
+    }
+
+    func testVariantAccessibilityLabels() {
+        XCTAssertEqual(MenuBarIconView.Variant.off.accessibilityLabel,        "LayerKeys, idle")
+        XCTAssertEqual(MenuBarIconView.Variant.nav.accessibilityLabel,        "LayerKeys, navigation layer active")
+        XCTAssertEqual(MenuBarIconView.Variant.numpad.accessibilityLabel,     "LayerKeys, numpad layer active")
+        XCTAssertEqual(MenuBarIconView.Variant.denied.accessibilityLabel,     "LayerKeys, input monitoring permission denied")
+        XCTAssertEqual(MenuBarIconView.Variant.listenOnly.accessibilityLabel, "LayerKeys, listen-only mode — tap-to-Escape disabled")
+        XCTAssertEqual(MenuBarIconView.Variant.error.accessibilityLabel,      "LayerKeys, event tap error")
+    }
+
+    // MARK: - MenuBarIconView smoke render
+
+    @MainActor
+    func testMenuBarIconViewOffRendersToNonNilImage() {
+        let view = MenuBarIconView(variant: .off, updateBadge: false)
+            .frame(width: 18, height: 18)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2.0
+
+        let image = renderer.nsImage
+        XCTAssertNotNil(image, ".off variant must render to a non-nil NSImage")
+        XCTAssertEqual(image?.size, CGSize(width: 18, height: 18))
     }
 }
 
