@@ -9,6 +9,7 @@ final class AppModel: ObservableObject {
     @Published var mappingProfile: MappingProfile
     @Published var lastError: String?
     @Published private(set) var launchAtLoginEnabled: Bool
+    @Published private(set) var tapErrorActive: Bool = false
 
     private let mappingStore: MappingStore
     private let eventTapService: EventTapService
@@ -44,6 +45,12 @@ final class AppModel: ObservableObject {
         service.onTapError = { [weak self] message in
             Task { @MainActor in
                 self?.lastError = message
+                self?.tapErrorActive = true
+            }
+        }
+        service.onTapRecovered = { [weak self] in
+            Task { @MainActor in
+                self?.tapErrorActive = false
             }
         }
 

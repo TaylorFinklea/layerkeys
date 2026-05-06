@@ -799,6 +799,40 @@ final class LayerKeysTests: XCTestCase {
             XCTAssertTrue(error is StoreFailure)
         }
     }
+
+    // MARK: - AppModel tapErrorActive
+
+    @MainActor
+    func testAppModelTapErrorActiveDefaultsFalse() {
+        let service = EventTapService(profile: .default)
+        let model = AppModel(eventTapService: service)
+        XCTAssertFalse(model.tapErrorActive)
+    }
+
+    @MainActor
+    func testAppModelTapErrorActiveBecomesTrueOnTapError() async {
+        let service = EventTapService(profile: .default)
+        let model = AppModel(eventTapService: service)
+
+        service.onTapError?("simulated tap death")
+        await Task.yield()  // let the @MainActor Task scheduled by the closure run
+
+        XCTAssertTrue(model.tapErrorActive)
+    }
+
+    @MainActor
+    func testAppModelTapErrorActiveBecomesFalseOnTapRecovered() async {
+        let service = EventTapService(profile: .default)
+        let model = AppModel(eventTapService: service)
+
+        service.onTapError?("simulated tap death")
+        await Task.yield()
+        XCTAssertTrue(model.tapErrorActive)
+
+        service.onTapRecovered?()
+        await Task.yield()
+        XCTAssertFalse(model.tapErrorActive)
+    }
 }
 
 private final class StubLaunchAtLoginStore: LaunchAtLoginStore {
