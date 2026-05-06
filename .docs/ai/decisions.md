@@ -409,3 +409,48 @@ with `codesign --verify --deep --strict` passing on the result. Two
 escape hatches keep dev workflows ergonomic: `SKIP_CODESIGN=1` for
 contributors without a Developer ID cert, `SKIP_NOTARIZE=1` for fast
 local iteration.
+
+## [2026-05-06] M4b menu-bar icon: custom SwiftUI keycap glyph over SF Symbols
+
+**Context**: The pre-M4b menu bar showed `Image(systemName: model.mode.symbolName) + Text(model.mode.menuBarLabel)` — three SF Symbols (`circle`, `arrow.up.left.and.arrow.down.right`, `number.square`) paired with hardcoded `LK`/`NAV`/`NUM` text labels, plus an `exclamationmark.triangle.fill` fallback when permission was denied. Two known visibility gaps: (a) listen-only permission state was indistinguishable from "all good," and (b) Sparkle update + tap-error signals lived only in the menu's `lastError` string, not in the menu-bar icon itself.
+
+**Decision**: Replace the SF Symbol + text pair with a single custom SwiftUI `MenuBarIconView` rendering a keycap silhouette as the constant identity, with state-distinct inner content. Seven visual states: off / nav / numpad / denied / listen-only / update-available / tap-error. Drop the text label entirely.
+
+**Alternatives considered**:
+- Template image asset catalog (`MenuBarOff.imageset` × 7, PDF, "Render as Template"). Most Apple-idiomatic, but template images are single-color by definition — orange-denied / red-error require either non-template variants (losing automatic system tinting) or a SwiftUI tint override on top of color-baked assets.
+- Custom SF Symbol set. Apple's "official" path for designed-from-scratch glyphs, but requires authoring in Apple's SF Symbols app + maintaining `.svg` files in their exact layer-structure format. Heavyweight for 7 closely related glyphs.
+- Keep SF Symbols but design distinct ones per state. Generic SF Symbols collapsed onto each other at 16pt menu-bar size during brainstorming mockups; couldn't find 7 distinct, coherent symbols in Apple's library.
+
+**Rationale**: A bespoke silhouette is the small amount of design work that buys ever-distinguishable state visualization at menu-bar size. The keycap metaphor anchors the brand to "keyboard" without competing with the rest of macOS. Visual concept validated during brainstorming via a browser-based mockup grid; revisions to nav/numpad/listen-only kept inner content cleanly inside the cap silhouette.
+
+## [2026-05-06] Path/Canvas rendering over template-image PDFs
+
+**Context**: Once the bespoke design was locked, the rendering choice was: SwiftUI `Path`/`Canvas` (translate validated SVG paths directly to Swift), template-image PDFs in `Assets.xcassets` (Apple-idiomatic), or a custom SF Symbol set.
+
+**Decision**: SwiftUI `Path`/`Canvas`. The validated SVG path strings translate one-to-one into Swift `Path` calls inside a `Canvas` block. Color comes from `.foregroundStyle(variant.tint)` propagating to `.foreground` shading on every stroke/fill — no color baked into assets.
+
+**Alternatives considered**: Template image PDFs (rejected: single-color limitation fights the orange-denied / red-error states). Custom SF Symbol set (rejected: heavyweight authoring path for 7 closely related glyphs).
+
+**Rationale**: Single source of truth — the validated SVG geometry becomes Swift literally. Per-variant tinting via `.foregroundStyle` is trivial (`Variant.tint` returns `.orange` for denied, `.red` for error, `.primary` otherwise). Resolution-independent at any menu-bar size. Easy to iterate on geometry later (nudge a chevron 0.5 units in code, rebuild). Trade-off accepted: lose the automatic system tinting that template images get on appearance changes, but we don't want it for the orange/red states anyway.
+
+## [2026-05-06] Drop the menu-bar text label
+
+**Context**: The previous menu bar showed an icon followed by `LK` / `NAV` / `NUM`. With state-distinct iconography, the text label became redundant.
+
+**Decision**: Remove the `Text(model.mode.menuBarLabel)` element from the `MenuBarExtra` label closure. The new `MenuBarIconView` is the entire visual indicator. Delete `LayerMode.menuBarLabel` and `LayerMode.symbolName` since both have no remaining consumers.
+
+**Alternatives considered**: Keep the text as an explicit "what mode am I in" channel for users who want a readable string. Make the text user-toggleable in Settings.
+
+**Rationale**: Glyph-only matches every other macOS utility convention. The accessibility label on `MenuBarIconView` (`"LayerKeys, navigation layer active"` etc.) gives VoiceOver users a fuller signal than the prior 3-letter strings. A user-facing toggle is feature-creep against the "minimalist nav + numpad, done right" identity.
+
+## [2026-05-06] Variant priority order: error > denied > listen-only > mode
+
+**Context**: With 7 visual states, the resolver needs to decide which variant wins when multiple inputs are active. Two natural orderings: (a) by severity (errors and permissions block the mode signal), or (b) by mode-first (always show what layer you're in, overlay everything else as decoration).
+
+**Decision**: Priority order is `tapErrorActive > permissionState == .denied > permissionState == .listenOnly > mode`. Update badge composes onto listen-only / off / nav / numpad but never onto error or denied.
+
+**Alternatives considered**:
+- Mode-first with severity overlays. Rejected: stacking a red ✕ over a 4-way arrow cluster at 16pt is illegible.
+- Symmetric composition (error-and-denied each overlay independently). Rejected: incoherent UX (can't be both "no permission" AND "tap died" simultaneously — denied implies the tap was never created).
+
+**Rationale**: Errors and permissions are blocking — they should preempt the mode display because the mode signal is irrelevant when the tap can't function. Listen-only is a partial-failure mode where the layers still work, so we show the listen-only marker but allow the user to infer mode from their interaction (they know whether they're holding the trigger). Update badge composes only on non-alert variants because stacking "update available" on top of "tap error" is incoherent — fix the error first.

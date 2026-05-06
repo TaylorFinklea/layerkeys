@@ -18,11 +18,11 @@ reliability, and zero-friction install are the long-term differentiators.
 Active items. Trim as completed.
 
 ### Now
-- **M4a Phase E.4** *(user action)* — `brew install --cask TaylorFinklea/tap/layerkeys` on a setup that's never run LayerKeys before. Confirm the app opens with no Gatekeeper dialog and the first-launch "Start LayerKeys at login?" prompt appears exactly once. This is the only test left in the M4a definition that requires real macOS UI.
+- **M4b menu-bar icon redesign — manual smoke test** *(user action)*. Run the just-built debug app and walk the 7 states (off → nav → numpad → denied → listen-only → update available → tap error). Each variant should produce a visually distinct keycap glyph in the menu bar; orange for denied, red for error. Steps in `docs/superpowers/plans/2026-05-06-menubar-icon-redesign.md` Task 11.
+- **M4a Phase E.4** *(user action, still pending)* — `brew install --cask TaylorFinklea/tap/layerkeys` on a setup that's never run LayerKeys before. Confirm the app opens with no Gatekeeper dialog and the first-launch "Start LayerKeys at login?" prompt appears exactly once. This is the only test left in the M4a definition that requires real macOS UI.
 
 ### Next
-- **M4b kickoff** — first-run onboarding wizard, conflict warnings in binding editor, hand-designed app icon refresh, marketing pass, non-US keyboard-layout glyph labels, then version bump to 1.0.0. See M4b list in this file.
-- Visual smoke test of Phase A's still-unverified UI bits (Settings "General" tab, menu-bar Check-for-Updates button) — useful to catch any regressions before M4b changes touch them.
+- Remaining M4b items: first-run onboarding wizard, conflict warnings in binding editor, hand-designed *app* icon (the dock/Finder one — separate from the menu-bar icon that just shipped), marketing pass, non-US keyboard-layout glyph labels, then version bump to 1.0.0. See M4b list in this file.
 
 ### Later
 - Backlog Sonnet-tier: extract the duplicated `add/remove/update*Binding` methods in `AppModel` into a generic over a `WritableKeyPath`. Good pre-M4b warmup once 0.2.0 is out.
@@ -125,9 +125,10 @@ to verify the pipeline independently of UX work).
 Once M4a ships 0.2.0, M4b takes the app from "stranger can install it" to
 "stranger sticks with it." UI work, no further pipeline changes.
 
+- [x] **Menu-bar icon redesign** — replaced the SF-Symbol + "LK"/"NAV"/"NUM" text-label pair with a custom keycap-silhouette glyph rendered via SwiftUI `Canvas`. Seven distinct visual states (off / nav / numpad / denied / listen-only / update available / tap error), driven by a pure `resolveMenuBarVariant(...)` function over `(mode, perm, tapErrorActive, updateAvailable)`. Listen-only is now visible in the menu bar — closes the M3 visibility gap. New AppModel inputs: `tapErrorActive` (paired with new `EventTapService.onTapRecovered` callback) and `updateAvailable` (driven by a new `SparkleUpdateObserver: SPUUpdaterDelegate`). Verified by 33 new tests (resolver priority order × 11, AppModel plumbing × 9, MenuBarIconView smoke renders × 7, Variant data × 2, SparkleUpdateObserver × 1, plus 3 SleepWakeHandler recovery tests). Spec at `docs/superpowers/specs/2026-05-06-menubar-icon-design.md`; plan at `docs/superpowers/plans/2026-05-06-menubar-icon-redesign.md`.
 - [ ] First-run onboarding window: explains the trigger chord, requests Input Monitoring + Accessibility permissions inline, and dismisses itself once both are granted — verified by deleting the app's TCC entries and relaunching. (Richer than M4a's launch-at-login one-shot; that prompt stays.)
 - [ ] Conflict warnings in the binding editor: when two bindings share a source key, the row that "loses" gets a non-blocking warning chip — verified visually.
-- [ ] App icon refresh — replace the `generate_app_icon.swift` placeholder with a deliberate icon set — verified visually at all required sizes.
+- [ ] App icon refresh — replace the `generate_app_icon.swift` placeholder with a deliberate icon set — verified visually at all required sizes. (Note: this is the dock/Finder app icon — different from the menu-bar icon, which shipped above.)
 - [ ] Marketing pass: README screenshots, GIF of nav/numpad in action, accurate permission language, link to landing copy.
 - [ ] Non-US keyboard-layout glyph labels in Settings pickers (deferred from M3).
 - [ ] Version bumped to `1.0.0` in `project.yml`, tagged `v1.0.0`, release published, Homebrew tap updated — verified by `brew install --cask TaylorFinklea/tap/layerkeys` on a fresh machine.

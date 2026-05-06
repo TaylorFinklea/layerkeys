@@ -8,6 +8,107 @@
 
 ## Last Session Summary
 
+**Date**: 2026-05-06 (M4b — menu-bar icon redesign)
+
+- **Brainstormed → speced → planned → implemented in one session.**
+  Replaced the `Image(systemName:) + Text("LK"/"NAV"/"NUM")` menu-bar
+  pair with a custom keycap-silhouette glyph in 7 visual states.
+  Brainstorming via the visual companion (Option C, "keyboard cap as
+  constant identity, content morphs by state") at
+  `.superpowers/brainstorm/10345-1778066998/content/`. Spec committed
+  at `bb8c581`, plan at `22e3ec5`.
+
+- **Implementation in 11 TDD tasks dispatched to subagents** (one fresh
+  Sonnet implementer per task + spec-compliance review + code-quality
+  review). Each task ended with its own commit; the repo stayed
+  shippable between commits. Final commit is `c87d5ea` (Task 10 wired
+  MenuBarIconView into LayerKeysApp).
+
+- **Architecture:**
+  - **`LayerKeys/MenuBarIconView.swift`** *(new)* — SwiftUI `Canvas`
+    drawing a 24-unit-viewBox keycap silhouette + per-variant inner
+    content. `Variant.tint` tints denied orange, error red, others
+    `.primary`. `.foregroundStyle(variant.tint)` propagates to
+    `.foreground` shading on every stroke/fill. 174 lines.
+  - **`resolveMenuBarVariant(mode:perm:tapErrorActive:updateAvailable:)`**
+    — top-level pure function. Priority: error > denied > listen-only
+    > mode. Update badge composes onto non-alert variants only.
+  - **`AppModel`** gained two `@Published private(set)` flags
+    (`tapErrorActive`, `updateAvailable`) + a `setUpdateAvailable(_:)`
+    setter + a `menuBarVariant` computed property forwarding the four
+    inputs to the resolver.
+  - **`EventTapService`** gained an `onTapRecovered: (() -> Void)?`
+    callback paired with the existing `onTapError`. `SleepWakeHandler`
+    fires `onRecover` after either re-enable or restart-engine
+    fallback yields a live tap.
+  - **`SparkleUpdateObserver`** *(new class in
+    `LayerKeysApp.swift`)* — `NSObject` + `SPUUpdaterDelegate`. Bridges
+    `didFindValidUpdate` / `updaterDidNotFindUpdate` /
+    `didFinishUpdateCycleFor` into `model.setUpdateAvailable`. Owned by
+    `LayerKeysApp` so the Sparkle controller's weak delegate stays
+    alive. Plan's draft signature included
+    `didDismissUpdateAlertPermanently` which doesn't exist in
+    Sparkle 2.9.1; removed.
+  - **`LayerMode.menuBarLabel` / `LayerMode.symbolName`** deleted (no
+    consumers after the wire-up).
+
+- **Listen-only state is now visible in the menu bar.** Closes the M3
+  visibility gap noted at the top of `decisions.md` 2026-04-20.
+
+- **Tests**: 51 → 84. Added 33 tests across the 11 tasks:
+  - `SleepWakeHandler.onRecover` × 3
+  - `AppModel.tapErrorActive` plumbing × 3
+  - `AppModel.updateAvailable` + `SparkleUpdateObserver` × 3
+  - `resolveMenuBarVariant` priority order × 11
+  - `AppModel.menuBarVariant` × 3
+  - `Variant.tint` and `Variant.accessibilityLabel` × 2
+  - `MenuBarIconView` smoke renders × 7 (1 per variant + 2 badge composition)
+
+- **Deviations from the plan, resolved inline by reviewers/implementers:**
+  - Sparkle 2.9.1's `SPUUpdaterDelegate` doesn't have
+    `didDismissUpdateAlertPermanently`. Removed; `didFinishUpdateCycleFor`
+    covers the dismissed path.
+  - `didFinishUpdateCycleFor` Swift import name is
+    `updater(_:didFinishUpdateCycleFor:error:)`, not the plan's draft
+    `didFinishUpdateCycleForUpdateCheck`.
+  - Two `AppModel.menuBarVariant` tests needed an explicit
+    `model.permissionState = .granted` to avoid CI's
+    `PermissionController.currentState() == .denied` short-circuit.
+  - Tests use smoke renders (`ImageRenderer.nsImage != nil`) instead of
+    the spec's pixel-byte snapshots — pixel snapshots in macOS XCTest
+    are fragile across OS/Xcode versions, and the high-value
+    regressions (state-mapping bugs, accidental crashes) are caught by
+    the resolver tests + smoke renders. Visual correctness is verified
+    by the Task 11 manual smoke test.
+
+- **Worth keeping in mind:**
+  - Reviewer noted `LayerKeysApp.swift` now has 4 responsibilities
+    (`@main App` / `CheckForUpdatesViewModel` / `CheckForUpdatesView` /
+    `SparkleUpdateObserver`); extracting `SparkleUpdateObserver.swift`
+    is reasonable polish for a future cleanup pass.
+  - `SparkleUpdateObserver`'s delegate methods wrap `setAvailable` in
+    `Task { @MainActor in ... }`. Sparkle docs say delegates fire on
+    main, so this is over-defensive. Marking the class itself
+    `@MainActor` would let those `Task` hops drop.
+  - `MenuBarIconView`'s `drawInnerContent` is 75 lines with all 6
+    variants. Cohesive at this size. If a future task adds animation
+    or hit-testing per variant, consider extracting per-variant draw
+    helpers.
+  - The literal `18` (menu-bar icon size) appears at 9 sites
+    (production + 8 tests). A `static let menuBarSize: CGFloat = 18`
+    on `MenuBarIconView` would centralize it if the size ever changes.
+
+- **Files touched this session**:
+  - `LayerKeys/MenuBarIconView.swift` *(new, 174 lines)*
+  - `LayerKeys/EventTapService.swift` (onTapRecovered + SleepWakeHandler.onRecover)
+  - `LayerKeys/AppModel.swift` (tapErrorActive, updateAvailable, setUpdateAvailable, menuBarVariant)
+  - `LayerKeys/LayerKeysApp.swift` (SparkleUpdateObserver class + wire-up MenuBarIconView)
+  - `LayerKeys/KeyCatalog.swift` (deleted LayerMode.menuBarLabel + .symbolName)
+  - `LayerKeysTests/LayerKeysTests.swift` (+33 tests, +`import SwiftUI`)
+  - `LayerKeys.xcodeproj/project.pbxproj` (xcodegen regen for new file)
+  - `docs/superpowers/specs/2026-05-06-menubar-icon-design.md` *(new)*
+  - `docs/superpowers/plans/2026-05-06-menubar-icon-redesign.md` *(new)*
+
 **Date**: 2026-05-05 (afternoon — Phase D + E)
 
 - **M4a Phase D shipped end-to-end.** `gh repo create
@@ -175,22 +276,24 @@
 
 ## Build Status
 
-- Tests: **51/51 green** (47 pre-M4a + 4 new `LaunchAtLoginController` tests).
-- Release script: signing path validated end-to-end locally via
-  `SKIP_NOTARIZE=1`. Notarization path code-complete but not yet exercised.
-- Release: still `0.1.0`. Bump to `0.2.0` happens in Phase E.
+- Tests: **84/84 green** (51 pre-M4b + 33 new across the menu-bar icon
+  redesign tasks).
+- Release: 0.2.0 shipped (M4a Phase E). Menu-bar icon redesign is
+  unreleased — sitting on `main` past `v0.2.0`. The next public
+  release that includes it will pick up the new icon automatically.
 
 ## Blockers
 
-- **Phase E.4 (end-user smoke test) needs you**: `brew install --cask
+- **M4b menu-bar icon manual smoke test (needs you)**: launch the just-built
+  debug app and walk all 7 visual states. Steps in
+  `docs/superpowers/plans/2026-05-06-menubar-icon-redesign.md` Task 11.
+  Build path:
+  `~/Library/Developer/Xcode/DerivedData/LayerKeys-*/Build/Products/Debug/LayerKeys.app`.
+- **M4a Phase E.4 (still pending)**: `brew install --cask
   TaylorFinklea/tap/layerkeys` on a setup that's never run LayerKeys
   before. Confirm: app opens with no Gatekeeper dialog, first-launch
   "Start LayerKeys at login?" alert appears once, menu-bar
-  Check-for-Updates button is reachable. After this, M4a is fully
-  closed and M4b can begin.
-- **Visual smoke test deferred**: I haven't actually launched the debug app
-  to confirm the Settings "General" tab renders correctly, the first-launch
-  `NSAlert` fires from a deferred main-actor `Task`, and the menu-bar
-  Check-for-Updates button shows up. All compile cleanly and tests pass, but
-  UI feel hasn't been eyeballed. No system-state-changing prompts (Input
-  Monitoring, login-item registration) have been triggered.
+  Check-for-Updates button is reachable.
+- **Visual smoke test of M4a Phase A still deferred**: Settings "General"
+  tab, first-launch `NSAlert`, menu-bar Check-for-Updates button — all
+  compile cleanly and tests pass, but UI feel hasn't been eyeballed.
