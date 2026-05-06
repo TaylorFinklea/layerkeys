@@ -691,7 +691,7 @@ final class LayerKeysTests: XCTestCase {
 
     func testSleepWakeHandlerFiresOnRecoverAfterReEnableSucceeds() {
         var reEnableCount = 0
-        var aliveSequence = [false, true]   // first probe: dead; second probe: alive after re-enable
+        var aliveSequence = [true]   // single probe after reEnableTap: alive
         var recoveredCount = 0
         var errorMessages: [String] = []
 
@@ -717,7 +717,7 @@ final class LayerKeysTests: XCTestCase {
     func testSleepWakeHandlerFiresOnRecoverAfterRestartEnginePath() {
         var reEnableCount = 0
         var restartCount = 0
-        var aliveSequence = [false, false, true]  // dead after re-enable AND after restart probe... then alive
+        var aliveSequence = [false, true]  // dead after re-enable, alive after restart
         var recoveredCount = 0
 
         var handler = SleepWakeHandler(

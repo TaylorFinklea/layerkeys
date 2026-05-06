@@ -24,10 +24,6 @@ struct SleepWakeHandler {
             onRecover()
             return
         }
-        if isTapAlive() {
-            onRecover()
-            return
-        }
 
         onError("Restarting event tap after sleep recovery.")
         restartEngine()
