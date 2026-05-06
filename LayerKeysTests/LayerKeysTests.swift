@@ -1009,6 +1009,22 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertNotNil(image, ".off variant must render to a non-nil NSImage")
         XCTAssertEqual(image?.size, CGSize(width: 18, height: 18))
     }
+
+    @MainActor
+    func testMenuBarIconViewNavRenders() {
+        let view = MenuBarIconView(variant: .nav, updateBadge: false).frame(width: 18, height: 18)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2.0
+        XCTAssertNotNil(renderer.nsImage)
+    }
+
+    @MainActor
+    func testMenuBarIconViewNumpadRenders() {
+        let view = MenuBarIconView(variant: .numpad, updateBadge: false).frame(width: 18, height: 18)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2.0
+        XCTAssertNotNil(renderer.nsImage)
+    }
 }
 
 private final class StubLaunchAtLoginStore: LaunchAtLoginStore {

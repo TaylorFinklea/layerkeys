@@ -68,9 +68,44 @@ struct MenuBarIconView: View {
         case .off:
             let dot = Path(ellipseIn: CGRect(x: 12 - 0.6, y: 15 - 0.6, width: 1.2, height: 1.2))
             ctx.fill(dot, with: .foreground)
-        case .nav, .numpad, .denied, .listenOnly, .error:
-            // Filled in by Tasks 7-9.
-            break
+
+        case .nav:
+            // 4-way directional cluster: cross + 4 chevrons, all within
+            // x=9.5..14.5, y=12.5..17.5 (entirely inside the lower face).
+            let stroke = StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round)
+            let cross = Path { p in
+                p.move(to: CGPoint(x: 12,   y: 12.5)); p.addLine(to: CGPoint(x: 12,   y: 17.5))
+                p.move(to: CGPoint(x: 9.5,  y: 15));   p.addLine(to: CGPoint(x: 14.5, y: 15))
+            }
+            ctx.stroke(cross, with: .foreground, style: stroke)
+            let chevrons = Path { p in
+                p.move(to: CGPoint(x: 10.8, y: 13.7)); p.addLine(to: CGPoint(x: 12, y: 12.5)); p.addLine(to: CGPoint(x: 13.2, y: 13.7))
+                p.move(to: CGPoint(x: 10.8, y: 16.3)); p.addLine(to: CGPoint(x: 12, y: 17.5)); p.addLine(to: CGPoint(x: 13.2, y: 16.3))
+                p.move(to: CGPoint(x: 10.7, y: 14.0)); p.addLine(to: CGPoint(x: 9.5,  y: 15)); p.addLine(to: CGPoint(x: 10.7, y: 16.0))
+                p.move(to: CGPoint(x: 13.3, y: 14.0)); p.addLine(to: CGPoint(x: 14.5, y: 15)); p.addLine(to: CGPoint(x: 13.3, y: 16.0))
+            }
+            ctx.stroke(chevrons, with: .foreground, style: stroke)
+
+        case .numpad:
+            // 3x3 dot grid: cols x=8,12,16; rows y=13,15,17; r=0.7.
+            let dotRadius: CGFloat = 0.7
+            let columns: [CGFloat] = [8, 12, 16]
+            let rows: [CGFloat] = [13, 15, 17]
+            var grid = Path()
+            for x in columns {
+                for y in rows {
+                    grid.addEllipse(in: CGRect(
+                        x: x - dotRadius,
+                        y: y - dotRadius,
+                        width: dotRadius * 2,
+                        height: dotRadius * 2
+                    ))
+                }
+            }
+            ctx.fill(grid, with: .foreground)
+
+        case .denied, .listenOnly, .error:
+            break  // Filled in by Tasks 8-9.
         }
     }
 
