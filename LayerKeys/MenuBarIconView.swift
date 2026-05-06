@@ -130,12 +130,30 @@ struct MenuBarIconView: View {
             ctx.stroke(segments, with: .foreground, style: dashStroke)
 
         case .error:
-            break  // Filled in by Task 9.
+            // ✕: two crossed lines from (9,13.5)→(15,17.5) and (15,13.5)→(9,17.5).
+            // Cap shell is tinted .red via foregroundStyle.
+            let cross = Path { p in
+                p.move(to: CGPoint(x: 9,  y: 13.5)); p.addLine(to: CGPoint(x: 15, y: 17.5))
+                p.move(to: CGPoint(x: 15, y: 13.5)); p.addLine(to: CGPoint(x: 9,  y: 17.5))
+            }
+            ctx.stroke(cross, with: .foreground, style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
         }
     }
 
     private func drawUpdateBadge(in ctx: inout GraphicsContext) {
-        // Filled in by Task 9.
+        // Corner badge: filled circle at (20, 6) r=3 with white ↓ glyph inside.
+        // Sits in the upper-right outside the cap rect.
+        let disc = Path(ellipseIn: CGRect(x: 17, y: 3, width: 6, height: 6))
+        ctx.fill(disc, with: .foreground)
+
+        let arrow = Path { p in
+            p.move(to: CGPoint(x: 20,   y: 4.6))
+            p.addLine(to: CGPoint(x: 20, y: 7.4))
+            p.move(to: CGPoint(x: 18.7, y: 6.2))
+            p.addLine(to: CGPoint(x: 20, y: 7.5))
+            p.addLine(to: CGPoint(x: 21.3, y: 6.2))
+        }
+        ctx.stroke(arrow, with: .color(.white), style: StrokeStyle(lineWidth: 0.9, lineCap: .round, lineJoin: .round))
     }
 }
 
