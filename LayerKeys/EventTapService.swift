@@ -7,6 +7,7 @@ struct SleepWakeHandler {
     var isTapAlive: () -> Bool
     var restartEngine: () -> Void
     var onError: (String) -> Void
+    var onRecover: () -> Void
 
     private(set) var sleepPending = false
 
@@ -19,9 +20,20 @@ struct SleepWakeHandler {
         sleepPending = false
 
         reEnableTap()
-        if !isTapAlive() {
-            onError("Restarting event tap after sleep recovery.")
-            restartEngine()
+        if isTapAlive() {
+            onRecover()
+            return
+        }
+        if isTapAlive() {
+            onRecover()
+            return
+        }
+
+        onError("Restarting event tap after sleep recovery.")
+        restartEngine()
+
+        if isTapAlive() {
+            onRecover()
         }
     }
 }
@@ -29,6 +41,7 @@ struct SleepWakeHandler {
 final class EventTapService {
     var onModeChange: ((LayerMode) -> Void)?
     var onTapError: ((String) -> Void)?
+    var onTapRecovered: (() -> Void)?
 
     private let lock = NSLock()
     private var profile: MappingProfile
@@ -103,6 +116,9 @@ final class EventTapService {
             },
             onError: { [weak self] message in
                 self?.onTapError?(message)
+            },
+            onRecover: { [weak self] in
+                self?.onTapRecovered?()
             }
         )
 

@@ -569,7 +569,8 @@ final class LayerKeysTests: XCTestCase {
             reEnableTap: { recorder.reEnableTapCallCount += 1 },
             isTapAlive: { recorder.tapAliveResponse },
             restartEngine: { recorder.restartEngineCallCount += 1 },
-            onError: { recorder.onErrorMessages.append($0) }
+            onError: { recorder.onErrorMessages.append($0) },
+            onRecover: {}
         )
     }
 
@@ -684,6 +685,70 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertTrue(cleaned.contains(.maskAlphaShift))
         XCTAssertTrue(cleaned.contains(.maskShift))
         XCTAssertFalse(cleaned.contains(.maskControl))
+    }
+
+    // MARK: - SleepWakeHandler
+
+    func testSleepWakeHandlerFiresOnRecoverAfterReEnableSucceeds() {
+        var reEnableCount = 0
+        var aliveSequence = [false, true]   // first probe: dead; second probe: alive after re-enable
+        var recoveredCount = 0
+        var errorMessages: [String] = []
+
+        var handler = SleepWakeHandler(
+            reEnableTap: { reEnableCount += 1 },
+            isTapAlive: {
+                let next = aliveSequence.removeFirst()
+                return next
+            },
+            restartEngine: { XCTFail("restartEngine should not be called when re-enable revives the tap") },
+            onError: { errorMessages.append($0) },
+            onRecover: { recoveredCount += 1 }
+        )
+
+        handler.willSleep()
+        handler.didWake()
+
+        XCTAssertEqual(reEnableCount, 1)
+        XCTAssertEqual(recoveredCount, 1)
+        XCTAssertTrue(errorMessages.isEmpty)
+    }
+
+    func testSleepWakeHandlerFiresOnRecoverAfterRestartEnginePath() {
+        var reEnableCount = 0
+        var restartCount = 0
+        var aliveSequence = [false, false, true]  // dead after re-enable AND after restart probe... then alive
+        var recoveredCount = 0
+
+        var handler = SleepWakeHandler(
+            reEnableTap: { reEnableCount += 1 },
+            isTapAlive: { aliveSequence.removeFirst() },
+            restartEngine: { restartCount += 1 },
+            onError: { _ in },
+            onRecover: { recoveredCount += 1 }
+        )
+
+        handler.willSleep()
+        handler.didWake()
+
+        XCTAssertEqual(reEnableCount, 1)
+        XCTAssertEqual(restartCount, 1)
+        XCTAssertEqual(recoveredCount, 1)
+    }
+
+    func testSleepWakeHandlerSkipsRecoverWhenNoSleepPending() {
+        var recoveredCount = 0
+        var handler = SleepWakeHandler(
+            reEnableTap: { XCTFail("should not re-enable without a prior sleep") },
+            isTapAlive: { true },
+            restartEngine: { XCTFail("should not restart without a prior sleep") },
+            onError: { _ in },
+            onRecover: { recoveredCount += 1 }
+        )
+
+        handler.didWake()
+
+        XCTAssertEqual(recoveredCount, 0)
     }
 
     // MARK: - LaunchAtLoginController (M4a Phase A.2)
