@@ -215,6 +215,15 @@ final class AppModel: ObservableObject {
         saveMappings()
     }
 
+    var menuBarVariant: (variant: MenuBarIconView.Variant, badge: Bool) {
+        resolveMenuBarVariant(
+            mode: mode,
+            perm: permissionState,
+            tapErrorActive: tapErrorActive,
+            updateAvailable: updateAvailable
+        )
+    }
+
     func setUpdateAvailable(_ available: Bool) {
         updateAvailable = available
     }

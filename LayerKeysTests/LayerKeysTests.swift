@@ -939,6 +939,41 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertEqual(resolveMenuBarVariant(mode: .nav, perm: .granted, tapErrorActive: false, updateAvailable: false).variant, .nav)
         XCTAssertEqual(resolveMenuBarVariant(mode: .numpad, perm: .granted, tapErrorActive: false, updateAvailable: false).variant, .numpad)
     }
+
+    // MARK: - AppModel.menuBarVariant
+
+    @MainActor
+    func testAppModelMenuBarVariantReflectsMode() {
+        let model = AppModel(eventTapService: EventTapService(profile: .default))
+        model.permissionState = .granted
+        model.mode = .nav
+        let result = model.menuBarVariant
+        XCTAssertEqual(result.variant, .nav)
+        XCTAssertFalse(result.badge)
+    }
+
+    @MainActor
+    func testAppModelMenuBarVariantHonorsErrorPriority() async {
+        let service = EventTapService(profile: .default)
+        let model = AppModel(eventTapService: service)
+        model.mode = .numpad
+
+        service.onTapError?("simulated")
+        await Task.yield()
+
+        XCTAssertEqual(model.menuBarVariant.variant, .error)
+    }
+
+    @MainActor
+    func testAppModelMenuBarVariantBadgeOnUpdateWhenSafe() {
+        let model = AppModel(eventTapService: EventTapService(profile: .default))
+        model.permissionState = .granted
+        model.mode = .off
+        model.setUpdateAvailable(true)
+
+        XCTAssertEqual(model.menuBarVariant.variant, .off)
+        XCTAssertTrue(model.menuBarVariant.badge)
+    }
 }
 
 private final class StubLaunchAtLoginStore: LaunchAtLoginStore {
