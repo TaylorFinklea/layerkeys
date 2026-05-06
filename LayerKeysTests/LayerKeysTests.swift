@@ -871,6 +871,74 @@ final class LayerKeysTests: XCTestCase {
         await Task.yield()
         XCTAssertFalse(model.tapErrorActive)
     }
+
+    // MARK: - resolveMenuBarVariant
+
+    func testResolveOffWhenIdleGrantedNoErrorNoUpdate() {
+        let result = resolveMenuBarVariant(mode: .off, perm: .granted, tapErrorActive: false, updateAvailable: false)
+        XCTAssertEqual(result.variant, .off)
+        XCTAssertFalse(result.badge)
+    }
+
+    func testResolveOffBadgesWhenUpdateAvailable() {
+        let result = resolveMenuBarVariant(mode: .off, perm: .granted, tapErrorActive: false, updateAvailable: true)
+        XCTAssertEqual(result.variant, .off)
+        XCTAssertTrue(result.badge)
+    }
+
+    func testResolveNavWhenNavGrantedNoErrorNoUpdate() {
+        let result = resolveMenuBarVariant(mode: .nav, perm: .granted, tapErrorActive: false, updateAvailable: false)
+        XCTAssertEqual(result.variant, .nav)
+        XCTAssertFalse(result.badge)
+    }
+
+    func testResolveNumpadBadgesWhenUpdateAvailable() {
+        let result = resolveMenuBarVariant(mode: .numpad, perm: .granted, tapErrorActive: false, updateAvailable: true)
+        XCTAssertEqual(result.variant, .numpad)
+        XCTAssertTrue(result.badge)
+    }
+
+    func testResolveListenOnlyOverridesMode() {
+        let result = resolveMenuBarVariant(mode: .nav, perm: .listenOnly, tapErrorActive: false, updateAvailable: false)
+        XCTAssertEqual(result.variant, .listenOnly)
+        XCTAssertFalse(result.badge)
+    }
+
+    func testResolveListenOnlyBadgesWhenUpdateAvailable() {
+        let result = resolveMenuBarVariant(mode: .off, perm: .listenOnly, tapErrorActive: false, updateAvailable: true)
+        XCTAssertEqual(result.variant, .listenOnly)
+        XCTAssertTrue(result.badge)
+    }
+
+    func testResolveDeniedOverridesMode() {
+        let result = resolveMenuBarVariant(mode: .nav, perm: .denied, tapErrorActive: false, updateAvailable: false)
+        XCTAssertEqual(result.variant, .denied)
+        XCTAssertFalse(result.badge)
+    }
+
+    func testResolveDeniedNeverBadged() {
+        let result = resolveMenuBarVariant(mode: .nav, perm: .denied, tapErrorActive: false, updateAvailable: true)
+        XCTAssertEqual(result.variant, .denied)
+        XCTAssertFalse(result.badge)
+    }
+
+    func testResolveErrorOverridesEverything() {
+        let result = resolveMenuBarVariant(mode: .numpad, perm: .listenOnly, tapErrorActive: true, updateAvailable: true)
+        XCTAssertEqual(result.variant, .error)
+        XCTAssertFalse(result.badge)
+    }
+
+    func testResolveErrorOverridesDenied() {
+        let result = resolveMenuBarVariant(mode: .off, perm: .denied, tapErrorActive: true, updateAvailable: false)
+        XCTAssertEqual(result.variant, .error)
+        XCTAssertFalse(result.badge)
+    }
+
+    func testResolveModeMappingCoversAllLayerModes() {
+        XCTAssertEqual(resolveMenuBarVariant(mode: .off, perm: .granted, tapErrorActive: false, updateAvailable: false).variant, .off)
+        XCTAssertEqual(resolveMenuBarVariant(mode: .nav, perm: .granted, tapErrorActive: false, updateAvailable: false).variant, .nav)
+        XCTAssertEqual(resolveMenuBarVariant(mode: .numpad, perm: .granted, tapErrorActive: false, updateAvailable: false).variant, .numpad)
+    }
 }
 
 private final class StubLaunchAtLoginStore: LaunchAtLoginStore {

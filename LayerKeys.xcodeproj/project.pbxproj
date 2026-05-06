@@ -10,6 +10,7 @@
 		06EBC9EAD403CDCC3A9909DD /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = E6B4A48535405F482C08CB5B /* Sparkle */; };
 		2B6B17E4697DFDCEA1DF7BC8 /* KeyCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A5094C6125946F2A77371D9 /* KeyCatalog.swift */; };
 		34E83C846C82F6FAC11BB7FB /* LayerStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5614FE7F13E329CC440DE8DF /* LayerStateMachine.swift */; };
+		5520A0B467102C88D02A2763 /* MenuBarIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C151DB873BF77F8CC7AE6A73 /* MenuBarIconView.swift */; };
 		5DC0AC793F07F52841EAB450 /* StatusMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76229598D365EFE526A32A9 /* StatusMenuView.swift */; };
 		746419AF0F3F284984BF6781 /* LayerKeysTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F997B2F6CB021160246F70D /* LayerKeysTests.swift */; };
 		7A1D889E00F8B1DB8F89D32E /* EventTapEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 287902CDB6361EEDA6B8F0EA /* EventTapEngine.swift */; };
@@ -46,6 +47,7 @@
 		9FB17AD1847696A89A02AD51 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A02E6DF627BC5BCBB88A78F3 /* PermissionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionController.swift; sourceTree = "<group>"; };
 		A70D9F48A8E428361E238D4F /* LayerKeysApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerKeysApp.swift; sourceTree = "<group>"; };
+		C151DB873BF77F8CC7AE6A73 /* MenuBarIconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarIconView.swift; sourceTree = "<group>"; };
 		CBA671C6F3440AED4672E87C /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		D76229598D365EFE526A32A9 /* StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuView.swift; sourceTree = "<group>"; };
 		DB3A744F9D82A8A339E9BD91 /* LayerKeysTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LayerKeysTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -86,6 +88,7 @@
 				A70D9F48A8E428361E238D4F /* LayerKeysApp.swift */,
 				5614FE7F13E329CC440DE8DF /* LayerStateMachine.swift */,
 				2AB865736648036CD032AF79 /* MappingStore.swift */,
+				C151DB873BF77F8CC7AE6A73 /* MenuBarIconView.swift */,
 				A02E6DF627BC5BCBB88A78F3 /* PermissionController.swift */,
 				970B16249206FEAA364B9A3E /* SettingsView.swift */,
 				D76229598D365EFE526A32A9 /* StatusMenuView.swift */,
@@ -220,6 +223,7 @@
 				8976B90D597DF989111D20FE /* LayerKeysApp.swift in Sources */,
 				34E83C846C82F6FAC11BB7FB /* LayerStateMachine.swift in Sources */,
 				DFBAADFBDB155F80983BAB58 /* MappingStore.swift in Sources */,
+				5520A0B467102C88D02A2763 /* MenuBarIconView.swift in Sources */,
 				930D17BCE17BA9FCB5C5FAD9 /* PermissionController.swift in Sources */,
 				896A6D087F3E0381A12F625B /* SettingsView.swift in Sources */,
 				5DC0AC793F07F52841EAB450 /* StatusMenuView.swift in Sources */,
