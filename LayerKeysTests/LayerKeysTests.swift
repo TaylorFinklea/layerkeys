@@ -687,6 +687,44 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertFalse(cleaned.contains(.maskControl))
     }
 
+    // MARK: - AppModel updateAvailable
+
+    @MainActor
+    func testAppModelUpdateAvailableDefaultsFalse() {
+        let model = AppModel(eventTapService: EventTapService(profile: .default))
+        XCTAssertFalse(model.updateAvailable)
+    }
+
+    @MainActor
+    func testAppModelSetUpdateAvailableTogglesFlag() {
+        let model = AppModel(eventTapService: EventTapService(profile: .default))
+
+        model.setUpdateAvailable(true)
+        XCTAssertTrue(model.updateAvailable)
+
+        model.setUpdateAvailable(false)
+        XCTAssertFalse(model.updateAvailable)
+    }
+
+    // MARK: - SparkleUpdateObserver
+
+    @MainActor
+    func testSparkleUpdateObserverInvokesSetAvailable() {
+        var observed: [Bool] = []
+        let observer = SparkleUpdateObserver(setAvailable: { observed.append($0) })
+
+        // Drive the observer through its public closure-based init rather than
+        // exercising SPUUpdaterDelegate methods directly — we don't want to
+        // construct SUAppcastItem (which requires a complex dictionary in
+        // Sparkle 2.x) just to verify a 1-line forwarder. The delegate methods
+        // each call `setAvailable(true|false)` and are covered by the
+        // `xcodebuild build` link step plus the manual smoke test in Task 11.
+        observer.applyTrueForTesting()
+        observer.applyFalseForTesting()
+
+        XCTAssertEqual(observed, [true, false])
+    }
+
     // MARK: - SleepWakeHandler
 
     func testSleepWakeHandlerFiresOnRecoverAfterReEnableSucceeds() {

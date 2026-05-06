@@ -5,16 +5,20 @@ import SwiftUI
 struct LayerKeysApp: App {
     @StateObject private var model: AppModel
     private let updaterController: SPUStandardUpdaterController
+    private let updaterObserver: SparkleUpdateObserver
 
     init() {
         // Construct in init() rather than as default values so Swift 6.1
         // (Xcode 16.4) doesn't crash in `silgen emitStoredPropertyInitialization`
         // when @StateObject's wrappedValue autoclosure tries to call the
         // @MainActor-isolated AppModel.init.
-        _model = StateObject(wrappedValue: AppModel())
+        let model = AppModel()
+        let observer = SparkleUpdateObserver(model: model)
+        _model = StateObject(wrappedValue: model)
+        self.updaterObserver = observer
         updaterController = SPUStandardUpdaterController(
             startingUpdater: true,
-            updaterDelegate: nil,
+            updaterDelegate: observer,
             userDriverDelegate: nil
         )
     }
@@ -68,4 +72,43 @@ struct CheckForUpdatesView: View {
         }
         .disabled(!checker.canCheckForUpdates)
     }
+}
+
+final class SparkleUpdateObserver: NSObject, SPUUpdaterDelegate {
+    private let setAvailable: @MainActor (Bool) -> Void
+
+    init(setAvailable: @escaping @MainActor (Bool) -> Void) {
+        self.setAvailable = setAvailable
+        super.init()
+    }
+
+    convenience init(model: AppModel) {
+        self.init { available in
+            model.setUpdateAvailable(available)
+        }
+    }
+
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        Task { @MainActor in setAvailable(true) }
+    }
+
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
+        Task { @MainActor in setAvailable(false) }
+    }
+
+    func updater(_ updater: SPUUpdater,
+                 didFinishUpdateCycleFor updateCheck: SPUUpdateCheck,
+                 error: Error?) {
+        Task { @MainActor in setAvailable(false) }
+    }
+
+    #if DEBUG
+    /// Test hooks. The Sparkle delegate methods each forward to one of these
+    /// two paths; we expose them so unit tests don't have to construct an
+    /// `SUAppcastItem` (whose public init in Sparkle 2.x requires a complex
+    /// info-dictionary). Synchronous (no Task hop) so tests don't have to
+    /// yield. Production code never calls these.
+    @MainActor func applyTrueForTesting()  { setAvailable(true) }
+    @MainActor func applyFalseForTesting() { setAvailable(false) }
+    #endif
 }

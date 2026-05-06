@@ -10,6 +10,7 @@ final class AppModel: ObservableObject {
     @Published var lastError: String?
     @Published private(set) var launchAtLoginEnabled: Bool
     @Published private(set) var tapErrorActive: Bool = false
+    @Published private(set) var updateAvailable: Bool = false
 
     private let mappingStore: MappingStore
     private let eventTapService: EventTapService
@@ -212,6 +213,10 @@ final class AppModel: ObservableObject {
     func updateTriggerProfile(_ triggers: TriggerProfile) {
         mappingProfile.triggers = triggers
         saveMappings()
+    }
+
+    func setUpdateAvailable(_ available: Bool) {
+        updateAvailable = available
     }
 
     func quit() {
