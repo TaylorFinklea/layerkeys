@@ -280,3 +280,38 @@ for spec in specs {
 }
 
 try contents.data(using: .utf8)?.write(to: outputDirectory.appendingPathComponent("Contents.json"))
+
+// Also produce an AppIcon.icns adjacent to Info.plist. We bundle this
+// .icns directly rather than letting actool compile the asset catalog,
+// because on macOS 26 actool drops several icns slots (notably 512px and
+// 1024px) when source PNGs at "duplicate" pixel counts are byte-identical
+// — leaving the app with a visibly missing icon in Finder/Dock at large
+// sizes. iconutil produces a complete .icns from the same PNGs.
+let parent = outputDirectory.deletingLastPathComponent()  // Assets.xcassets/
+let layerKeysDir = parent.deletingLastPathComponent()     // LayerKeys/
+let icnsURL = layerKeysDir.appendingPathComponent("AppIcon.icns")
+
+let tmpIconset = URL(fileURLWithPath: NSTemporaryDirectory())
+    .appendingPathComponent("layerkeys-build-\(UUID().uuidString).iconset")
+try FileManager.default.createDirectory(at: tmpIconset, withIntermediateDirectories: true)
+defer { try? FileManager.default.removeItem(at: tmpIconset) }
+
+for spec in specs {
+    try FileManager.default.copyItem(
+        at: outputDirectory.appendingPathComponent(spec.filename),
+        to: tmpIconset.appendingPathComponent(spec.filename)
+    )
+}
+
+let iconutil = Process()
+iconutil.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
+iconutil.arguments = ["-c", "icns", tmpIconset.path, "-o", icnsURL.path]
+let errPipe = Pipe()
+iconutil.standardError = errPipe
+try iconutil.run()
+iconutil.waitUntilExit()
+if iconutil.terminationStatus != 0 {
+    let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+    fputs("iconutil failed: \(String(data: errData, encoding: .utf8) ?? "")\n", stderr)
+    exit(Int32(iconutil.terminationStatus))
+}
