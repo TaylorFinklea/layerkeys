@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		06EBC9EAD403CDCC3A9909DD /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = E6B4A48535405F482C08CB5B /* Sparkle */; };
-		1DD681AC5923EF7A053130CD /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 36884A5FEDF6C26609F8E904 /* AppIcon.icns */; };
 		2B6B17E4697DFDCEA1DF7BC8 /* KeyCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A5094C6125946F2A77371D9 /* KeyCatalog.swift */; };
 		34E83C846C82F6FAC11BB7FB /* LayerStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5614FE7F13E329CC440DE8DF /* LayerStateMachine.swift */; };
 		5520A0B467102C88D02A2763 /* MenuBarIconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C151DB873BF77F8CC7AE6A73 /* MenuBarIconView.swift */; };
@@ -41,7 +40,6 @@
 		287902CDB6361EEDA6B8F0EA /* EventTapEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTapEngine.swift; sourceTree = "<group>"; };
 		28F868D39D50E8E4FAF987FA /* EventTapService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTapService.swift; sourceTree = "<group>"; };
 		2AB865736648036CD032AF79 /* MappingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MappingStore.swift; sourceTree = "<group>"; };
-		36884A5FEDF6C26609F8E904 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		5614FE7F13E329CC440DE8DF /* LayerStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerStateMachine.swift; sourceTree = "<group>"; };
 		970B16249206FEAA364B9A3E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		98B1B1BB594D450EF5586F13 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -80,7 +78,6 @@
 		311090CD3DCA6152A0C82A2F /* LayerKeys */ = {
 			isa = PBXGroup;
 			children = (
-				36884A5FEDF6C26609F8E904 /* AppIcon.icns */,
 				CBA671C6F3440AED4672E87C /* AppModel.swift */,
 				98B1B1BB594D450EF5586F13 /* Assets.xcassets */,
 				287902CDB6361EEDA6B8F0EA /* EventTapEngine.swift */,
@@ -199,7 +196,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1DD681AC5923EF7A053130CD /* AppIcon.icns in Resources */,
 				889B2BEDC575E838FF768D3C /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -248,7 +244,7 @@
 		010767E47724CC60CDB400D2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -298,7 +294,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -310,7 +306,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MARKETING_VERSION = 0.2.2;
+				MARKETING_VERSION = 0.2.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -389,7 +385,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -407,7 +403,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MARKETING_VERSION = 0.2.2;
+				MARKETING_VERSION = 0.2.3;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -422,7 +418,7 @@
 		F203DDBC41CC2A5E862F4BC4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = NO;

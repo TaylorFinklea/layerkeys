@@ -5,8 +5,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: 6.0
-    MARKETING_VERSION: 0.2.2
-    CURRENT_PROJECT_VERSION: 4
+    MARKETING_VERSION: 0.2.3
+    CURRENT_PROJECT_VERSION: 5
 packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
@@ -27,21 +27,12 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: LayerKeys/Info.plist
         CODE_SIGN_STYLE: Automatic
-        # Bypass actool for the app icon. On macOS 26 actool drops several
-        # icns slots (notably 512px and 1024px) when source PNGs at
-        # duplicate pixel counts are byte-identical, leaving the app with
-        # a visibly missing icon in Finder/Dock at large sizes. We bundle
-        # a complete LayerKeys/AppIcon.icns built by iconutil instead;
-        # CFBundleIconFile in Info.plist points at it. The PNGs in
-        # Assets.xcassets/AppIcon.appiconset are kept for source-of-truth
-        # purposes and as input to iconutil via generate_app_icon.swift.
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
     info:
       path: LayerKeys/Info.plist
       properties:
         CFBundleDisplayName: LayerKeys
-        CFBundleShortVersionString: "0.2.2"
-        CFBundleVersion: "4"
+        CFBundleShortVersionString: "0.2.3"
+        CFBundleVersion: "5"
         LSApplicationCategoryType: public.app-category.utilities
         LSUIElement: true
         # Sparkle auto-update keys. The matching EdDSA private key is stored in the
