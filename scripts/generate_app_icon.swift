@@ -29,30 +29,21 @@ guard CommandLine.arguments.count >= 2 else {
 let outputDirectory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
 try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
-func symbolImage(pointSize: CGFloat) -> NSImage {
-    let configuration = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold, scale: .large)
-    let names = ["keyboard.fill", "keyboard"]
+// MARK: - Drawing
 
-    for name in names {
-        if let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(configuration)
-        {
-            return image
-        }
-    }
-
-    fatalError("Could not load a keyboard SF Symbol")
-}
-
+/// Renders the LayerKeys app icon at the given pixel size.
+///
+/// A single stylized keycap (matching MenuBarIconView's silhouette: rounded
+/// rect with a horizontal "shelf" line) centered on a deep-indigo squircle.
+/// 10% canvas padding leaves the squircle at 80% of canvas — Apple's modern
+/// macOS icon grid.
 func pngData(for size: Int) -> Data {
-    let width = size
-    let height = size
-    let imageSize = NSSize(width: width, height: height)
+    let s = CGFloat(size)
 
     guard let rep = NSBitmapImageRep(
         bitmapDataPlanes: nil,
-        pixelsWide: width,
-        pixelsHigh: height,
+        pixelsWide: size,
+        pixelsHigh: size,
         bitsPerSample: 8,
         samplesPerPixel: 4,
         hasAlpha: true,
@@ -64,92 +55,197 @@ func pngData(for size: Int) -> Data {
         fatalError("Could not create bitmap rep")
     }
 
-    rep.size = imageSize
+    rep.size = NSSize(width: size, height: size)
 
     NSGraphicsContext.saveGraphicsState()
+    defer { NSGraphicsContext.restoreGraphicsState() }
+
     guard let context = NSGraphicsContext(bitmapImageRep: rep) else {
         fatalError("Could not create graphics context")
     }
     NSGraphicsContext.current = context
 
-    let rect = NSRect(origin: .zero, size: imageSize)
-    let radius = CGFloat(size) * 0.224
-    let cardInset = CGFloat(size) * 0.06
-    let cardRect = rect.insetBy(dx: cardInset, dy: cardInset)
-    let cardPath = NSBezierPath(roundedRect: cardRect, xRadius: radius, yRadius: radius)
+    // At 16×16 the canvas is too small for gradients, shading, or a 3D
+    // shelf to render — anti-aliasing eats the detail and the icon
+    // becomes a mushy rectangle. Render a flat, high-contrast version
+    // so the silhouette stays legible.
+    if size <= 16 {
+        let smallInset = s * 0.05
+        let smallSquircle = NSRect(
+            x: smallInset, y: smallInset,
+            width: s - smallInset * 2, height: s - smallInset * 2
+        )
+        let smallRadius = smallSquircle.width * 0.2237
+        let smallPath = NSBezierPath(
+            roundedRect: smallSquircle,
+            xRadius: smallRadius, yRadius: smallRadius
+        )
+        NSColor(srgbRed: 0.18, green: 0.22, blue: 0.55, alpha: 1.0).setFill()
+        smallPath.fill()
 
-    let shadow = NSShadow()
-    shadow.shadowColor = NSColor(calibratedWhite: 0, alpha: 0.22)
-    shadow.shadowBlurRadius = CGFloat(size) * 0.08
-    shadow.shadowOffset = NSSize(width: 0, height: -CGFloat(size) * 0.024)
-    shadow.set()
+        let smallCapWidth = smallSquircle.width * 0.62
+        let smallCapHeight = smallSquircle.height * 0.50
+        let smallCapRect = NSRect(
+            x: smallSquircle.midX - smallCapWidth / 2,
+            y: smallSquircle.midY - smallCapHeight / 2,
+            width: smallCapWidth,
+            height: smallCapHeight
+        )
+        let smallCapPath = NSBezierPath(
+            roundedRect: smallCapRect,
+            xRadius: smallCapHeight * 0.20,
+            yRadius: smallCapHeight * 0.20
+        )
+        NSColor.white.setFill()
+        smallCapPath.fill()
 
-    let gradient = NSGradient(
-        colors: [
-            NSColor(calibratedRed: 0.15, green: 0.52, blue: 0.93, alpha: 1.0),
-            NSColor(calibratedRed: 0.09, green: 0.26, blue: 0.82, alpha: 1.0),
-        ]
-    )!
-    gradient.draw(in: cardPath, angle: -90)
+        guard let data = rep.representation(using: .png, properties: [:]) else {
+            fatalError("Could not encode PNG")
+        }
+        return data
+    }
 
+    let inset = s * 0.10
+    let squircleRect = NSRect(x: inset, y: inset, width: s - inset * 2, height: s - inset * 2)
+    let squircleRadius = squircleRect.width * 0.2237
+
+    // Drop shadow under the squircle (depth on Finder/Launchpad backgrounds).
+    if size >= 64 {
+        let bgShadow = NSShadow()
+        bgShadow.shadowColor = NSColor(calibratedWhite: 0, alpha: 0.18)
+        bgShadow.shadowBlurRadius = s * 0.025
+        bgShadow.shadowOffset = NSSize(width: 0, height: -s * 0.015)
+        bgShadow.set()
+    }
+
+    let squirclePath = NSBezierPath(
+        roundedRect: squircleRect,
+        xRadius: squircleRadius,
+        yRadius: squircleRadius
+    )
+
+    let backgroundGradient = NSGradient(colors: [
+        NSColor(srgbRed: 0.34, green: 0.42, blue: 0.78, alpha: 1.0),  // top
+        NSColor(srgbRed: 0.10, green: 0.13, blue: 0.36, alpha: 1.0),  // bottom
+    ])!
+    backgroundGradient.draw(in: squirclePath, angle: 270)
+
+    NSShadow().set()
+
+    // Inner top highlight on the squircle (lit-from-above feel).
+    if size >= 64 {
+        NSGraphicsContext.saveGraphicsState()
+        squirclePath.addClip()
+        let highlightRect = NSRect(
+            x: squircleRect.minX,
+            y: squircleRect.maxY - squircleRect.height * 0.45,
+            width: squircleRect.width,
+            height: squircleRect.height * 0.45
+        )
+        let highlight = NSGradient(colors: [
+            NSColor(calibratedWhite: 1.0, alpha: 0.10),
+            NSColor(calibratedWhite: 1.0, alpha: 0.0),
+        ])!
+        highlight.draw(in: highlightRect, angle: 270)
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    // Thin inner rim on the squircle.
+    if size >= 32 {
+        let rimInset = max(s * 0.004, 0.5)
+        let rimPath = NSBezierPath(
+            roundedRect: squircleRect.insetBy(dx: rimInset, dy: rimInset),
+            xRadius: squircleRadius - rimInset,
+            yRadius: squircleRadius - rimInset
+        )
+        NSColor(calibratedWhite: 1.0, alpha: 0.08).setStroke()
+        rimPath.lineWidth = max(s * 0.003, 0.5)
+        rimPath.stroke()
+    }
+
+    // Keycap geometry. Larger than the menu-bar icon's proportions so the
+    // shape survives at 16×16. Top face (above shelf) is taller than the
+    // side face below it — keycap perspective.
+    let capWidth = squircleRect.width * 0.74
+    let capHeight = squircleRect.height * 0.62
+    let capRect = NSRect(
+        x: squircleRect.midX - capWidth / 2,
+        y: squircleRect.midY - capHeight / 2,
+        width: capWidth,
+        height: capHeight
+    )
+    let capRadius = capHeight * 0.16
+    // Shelf sits above middle so the lit top face is the dominant area
+    // and the shadowed side face is a thinner band.
+    let shelfY = capRect.minY + capHeight * 0.35
+
+    // Keycap drop shadow under the whole cap.
+    if size >= 32 {
+        let capShadow = NSShadow()
+        capShadow.shadowColor = NSColor(calibratedWhite: 0, alpha: 0.32)
+        capShadow.shadowBlurRadius = s * 0.022
+        capShadow.shadowOffset = NSSize(width: 0, height: -s * 0.012)
+        capShadow.set()
+    }
+
+    let capPath = NSBezierPath(roundedRect: capRect, xRadius: capRadius, yRadius: capRadius)
+    capPath.addClip()  // shadow applies to the whole silhouette below
+    NSColor.white.setFill()
+    capPath.fill()
+
+    NSShadow().set()
     NSGraphicsContext.restoreGraphicsState()
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = context
 
-    let rimPath = NSBezierPath(roundedRect: cardRect.insetBy(dx: CGFloat(size) * 0.006, dy: CGFloat(size) * 0.006), xRadius: radius * 0.94, yRadius: radius * 0.94)
-    NSColor(calibratedWhite: 1.0, alpha: 0.16).setStroke()
-    rimPath.lineWidth = max(1, CGFloat(size) * 0.012)
-    rimPath.stroke()
+    // Re-fill the cap with a subtle top-down highlight, then darken the
+    // lower face so the shelf reads as a 3D edge rather than a divider.
+    NSGraphicsContext.saveGraphicsState()
+    capPath.addClip()
 
-    let panelHeight = CGFloat(size) * 0.22
-    let panelRect = NSRect(
-        x: cardRect.minX + CGFloat(size) * 0.04,
-        y: cardRect.minY + CGFloat(size) * 0.06,
-        width: cardRect.width - CGFloat(size) * 0.08,
-        height: panelHeight
+    // Top face: bright white with a hint of off-white at the bottom of
+    // the top face (just above the shelf).
+    let topFaceRect = NSRect(
+        x: capRect.minX,
+        y: shelfY,
+        width: capRect.width,
+        height: capRect.maxY - shelfY
     )
-    let panelPath = NSBezierPath(roundedRect: panelRect, xRadius: panelHeight * 0.4, yRadius: panelHeight * 0.4)
-    NSColor(calibratedWhite: 1.0, alpha: 0.14).setFill()
-    panelPath.fill()
+    let topFaceGradient = NSGradient(colors: [
+        NSColor(calibratedWhite: 0.97, alpha: 1.0),  // just above shelf
+        NSColor(calibratedWhite: 1.00, alpha: 1.0),  // top edge
+    ])!
+    topFaceGradient.draw(in: topFaceRect, angle: 90)
 
-    let glyphBackgroundSize = CGFloat(size) * 0.56
-    let glyphBackgroundRect = NSRect(
-        x: rect.midX - glyphBackgroundSize / 2,
-        y: rect.midY - glyphBackgroundSize / 2 + CGFloat(size) * 0.05,
-        width: glyphBackgroundSize,
-        height: glyphBackgroundSize
+    // Side face (below shelf): darker grey, suggests the cap's vertical
+    // side wall in shadow.
+    let sideFaceRect = NSRect(
+        x: capRect.minX,
+        y: capRect.minY,
+        width: capRect.width,
+        height: shelfY - capRect.minY
     )
-    let glyphBackgroundPath = NSBezierPath(roundedRect: glyphBackgroundRect, xRadius: glyphBackgroundSize * 0.22, yRadius: glyphBackgroundSize * 0.22)
-    NSColor(calibratedWhite: 1.0, alpha: 0.15).setFill()
-    glyphBackgroundPath.fill()
-
-    let symbol = symbolImage(pointSize: CGFloat(size) * 0.33)
-    let symbolSize = NSSize(width: CGFloat(size) * 0.38, height: CGFloat(size) * 0.38)
-    let symbolRect = NSRect(
-        x: rect.midX - symbolSize.width / 2,
-        y: rect.midY - symbolSize.height / 2 + CGFloat(size) * 0.05,
-        width: symbolSize.width,
-        height: symbolSize.height
-    )
-    symbol.draw(in: symbolRect, from: .zero, operation: .sourceOver, fraction: 1.0)
-
-    let badgeSize = CGFloat(size) * 0.18
-    let badgeRect = NSRect(
-        x: cardRect.maxX - badgeSize - CGFloat(size) * 0.05,
-        y: cardRect.maxY - badgeSize - CGFloat(size) * 0.05,
-        width: badgeSize,
-        height: badgeSize
-    )
-    let badgePath = NSBezierPath(roundedRect: badgeRect, xRadius: badgeSize * 0.38, yRadius: badgeSize * 0.38)
-    NSColor(calibratedRed: 0.45, green: 0.92, blue: 0.76, alpha: 0.95).setFill()
-    badgePath.fill()
-
-    let badgeInnerInset = badgeSize * 0.24
-    let badgeInner = badgeRect.insetBy(dx: badgeInnerInset, dy: badgeInnerInset)
-    NSColor(calibratedRed: 0.04, green: 0.20, blue: 0.28, alpha: 0.9).setFill()
-    NSBezierPath(roundedRect: badgeInner, xRadius: badgeInner.width * 0.24, yRadius: badgeInner.height * 0.24).fill()
+    let sideFaceGradient = NSGradient(colors: [
+        NSColor(calibratedWhite: 0.78, alpha: 1.0),  // bottom edge — darkest
+        NSColor(calibratedWhite: 0.88, alpha: 1.0),  // just below shelf
+    ])!
+    sideFaceGradient.draw(in: sideFaceRect, angle: 90)
 
     NSGraphicsContext.restoreGraphicsState()
+
+    // Crisp shelf line at the boundary between the two faces.
+    if size >= 32 {
+        let shelf = NSBezierPath()
+        shelf.move(to: NSPoint(x: capRect.minX, y: shelfY))
+        shelf.line(to: NSPoint(x: capRect.maxX, y: shelfY))
+
+        NSGraphicsContext.saveGraphicsState()
+        capPath.addClip()
+        NSColor(calibratedWhite: 0.0, alpha: 0.16).setStroke()
+        shelf.lineWidth = max(s * 0.006, 0.5)
+        shelf.stroke()
+        NSGraphicsContext.restoreGraphicsState()
+    }
 
     guard let data = rep.representation(using: .png, properties: [:]) else {
         fatalError("Could not encode PNG")
