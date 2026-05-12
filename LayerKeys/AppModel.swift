@@ -13,6 +13,14 @@ final class AppModel: ObservableObject {
     @Published private(set) var tapErrorActive: Bool = false
     @Published private(set) var updateAvailable: Bool = false
 
+    /// True only when both Input Monitoring and Accessibility are
+    /// granted. The status-menu permission rows hide themselves on this
+    /// condition — once everything is wired up the user shouldn't have
+    /// to see green checkmarks in the menu every time they open it.
+    var allPermissionsGranted: Bool {
+        permissionState != .denied && accessibilityGranted
+    }
+
     private let mappingStore: MappingStore
     private let eventTapService: EventTapService
     private let launchAtLoginController: LaunchAtLoginController

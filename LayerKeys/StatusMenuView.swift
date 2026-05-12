@@ -18,9 +18,11 @@ struct StatusMenuView: View {
 
             Divider()
 
-            permissionsSection
+            if !model.allPermissionsGranted {
+                permissionsSection
 
-            Divider()
+                Divider()
+            }
 
             Text(instructionText)
                 .font(.footnote)
