@@ -49,9 +49,16 @@ enum PermissionController {
 
     @discardableResult
     static func requestListenAccess() -> Bool {
-        let listenGranted = CGRequestListenEventAccess()
-        _ = CGRequestPostEventAccess()
-        return listenGranted
+        CGRequestListenEventAccess()
+    }
+
+    @discardableResult
+    static func requestPostAccess() -> Bool {
+        CGRequestPostEventAccess()
+    }
+
+    static var hasListenEventAccess: Bool {
+        CGPreflightListenEventAccess()
     }
 
     static var hasPostEventAccess: Bool {

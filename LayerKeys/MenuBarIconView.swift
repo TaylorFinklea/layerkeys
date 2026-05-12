@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct MenuBarIconView: View {
@@ -9,11 +10,26 @@ struct MenuBarIconView: View {
         case listenOnly
         case error
 
-        var tint: Color {
+        /// Color drawn into the rendered NSImage. For template-rendered
+        /// variants AppKit replaces the color with the menu-bar text color,
+        /// so the value here only needs to be opaque. Colored variants
+        /// (denied / error) opt out of template rendering and keep their
+        /// pixel color.
+        var drawColor: Color {
             switch self {
             case .denied: return .orange
             case .error:  return .red
-            default:      return .primary
+            default:      return .black
+            }
+        }
+
+        /// Monochrome variants render as template images so macOS auto-tints
+        /// them for the current menu-bar appearance. Colored variants opt
+        /// out so orange / red survive into the rendered image.
+        var usesTemplateRendering: Bool {
+            switch self {
+            case .denied, .error: return false
+            default:              return true
             }
         }
 
@@ -29,6 +45,10 @@ struct MenuBarIconView: View {
         }
     }
 
+    /// Rendered point size of the menu-bar image. Matches the frame
+    /// `LayerKeysApp` applies to the `MenuBarExtra` label.
+    private static let pointSize: CGFloat = 18
+
     /// Native viewBox the SVG paths were authored in. All draw calls happen
     /// in this 24-unit space and the Canvas scales to the actual size.
     private static let viewBox: CGFloat = 24
@@ -37,6 +57,34 @@ struct MenuBarIconView: View {
     let updateBadge: Bool
 
     var body: some View {
+        Image(nsImage: renderedImage())
+            .interpolation(.high)
+            .accessibilityLabel(variant.accessibilityLabel)
+    }
+
+    /// Renders the icon into an NSImage. Template flag is set per variant so
+    /// AppKit auto-tints monochrome variants to the menu-bar text color
+    /// (white on dark menu bar, black on light) while preserving pixel
+    /// color for orange / red signal states.
+    @MainActor
+    private func renderedImage() -> NSImage {
+        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        let renderer = ImageRenderer(content: drawing)
+        renderer.scale = scale
+
+        let pointSize = NSSize(width: Self.pointSize, height: Self.pointSize)
+        let image = renderer.nsImage ?? NSImage(size: pointSize)
+        image.size = pointSize
+        image.isTemplate = variant.usesTemplateRendering
+        return image
+    }
+
+    /// SwiftUI content that ImageRenderer rasterizes. Same Canvas drawing
+    /// the previous body used, but addressed by `variant.drawColor` instead
+    /// of `.primary` (which resolved to a transparent / context-dependent
+    /// color inside MenuBarExtra's label and caused the icon to render as
+    /// invisible).
+    private var drawing: some View {
         Canvas { ctx, size in
             let scale = min(size.width, size.height) / Self.viewBox
             ctx.scaleBy(x: scale, y: scale)
@@ -45,29 +93,31 @@ struct MenuBarIconView: View {
             drawInnerContent(in: &ctx)
             if updateBadge { drawUpdateBadge(in: &ctx) }
         }
-        .foregroundStyle(variant.tint)
-        .accessibilityLabel(variant.accessibilityLabel)
+        .frame(width: Self.pointSize, height: Self.pointSize)
     }
 
     // MARK: - Drawing primitives
 
     private func drawCapShell(in ctx: inout GraphicsContext) {
+        let color = GraphicsContext.Shading.color(variant.drawColor)
         let cap = Path(roundedRect: CGRect(x: 3, y: 5, width: 18, height: 14),
                        cornerSize: CGSize(width: 2.5, height: 2.5))
-        ctx.stroke(cap, with: .color(variant.tint), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+        ctx.stroke(cap, with: color, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
 
         let shelf = Path { p in
             p.move(to: CGPoint(x: 3, y: 11))
             p.addLine(to: CGPoint(x: 21, y: 11))
         }
-        ctx.stroke(shelf, with: .color(variant.tint), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+        ctx.stroke(shelf, with: color, style: StrokeStyle(lineWidth: 2, lineCap: .round))
     }
 
     private func drawInnerContent(in ctx: inout GraphicsContext) {
+        let color = GraphicsContext.Shading.color(variant.drawColor)
+
         switch variant {
         case .off:
             let dot = Path(ellipseIn: CGRect(x: 12 - 0.6, y: 15 - 0.6, width: 1.2, height: 1.2))
-            ctx.fill(dot, with: .color(variant.tint))
+            ctx.fill(dot, with: color)
 
         case .nav:
             // 4-way directional cluster: cross + 4 chevrons, all within
@@ -77,14 +127,14 @@ struct MenuBarIconView: View {
                 p.move(to: CGPoint(x: 12,   y: 12.5)); p.addLine(to: CGPoint(x: 12,   y: 17.5))
                 p.move(to: CGPoint(x: 9.5,  y: 15));   p.addLine(to: CGPoint(x: 14.5, y: 15))
             }
-            ctx.stroke(cross, with: .color(variant.tint), style: stroke)
+            ctx.stroke(cross, with: color, style: stroke)
             let chevrons = Path { p in
                 p.move(to: CGPoint(x: 10.8, y: 13.7)); p.addLine(to: CGPoint(x: 12, y: 12.5)); p.addLine(to: CGPoint(x: 13.2, y: 13.7))
                 p.move(to: CGPoint(x: 10.8, y: 16.3)); p.addLine(to: CGPoint(x: 12, y: 17.5)); p.addLine(to: CGPoint(x: 13.2, y: 16.3))
                 p.move(to: CGPoint(x: 10.7, y: 14.0)); p.addLine(to: CGPoint(x: 9.5,  y: 15)); p.addLine(to: CGPoint(x: 10.7, y: 16.0))
                 p.move(to: CGPoint(x: 13.3, y: 14.0)); p.addLine(to: CGPoint(x: 14.5, y: 15)); p.addLine(to: CGPoint(x: 13.3, y: 16.0))
             }
-            ctx.stroke(chevrons, with: .color(variant.tint), style: stroke)
+            ctx.stroke(chevrons, with: color, style: stroke)
 
         case .numpad:
             // 3x3 dot grid: cols x=8,12,16; rows y=13,15,17; r=0.7.
@@ -102,17 +152,17 @@ struct MenuBarIconView: View {
                     ))
                 }
             }
-            ctx.fill(grid, with: .color(variant.tint))
+            ctx.fill(grid, with: color)
 
         case .denied:
             // Diagonal slash from (5,6) to (19,18) at stroke-width 2.5.
-            // Cap shell is already drawn (and tinted .orange via variant.tint);
+            // Cap shell is already drawn (and tinted .orange via drawColor);
             // the slash composes on top in the same color.
             let slash = Path { p in
                 p.move(to: CGPoint(x: 5, y: 6))
                 p.addLine(to: CGPoint(x: 19, y: 18))
             }
-            ctx.stroke(slash, with: .color(variant.tint), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+            ctx.stroke(slash, with: color, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
 
         case .listenOnly:
             // Six explicit dash segments, three per row, mathematically
@@ -127,33 +177,40 @@ struct MenuBarIconView: View {
                     }
                 }
             }
-            ctx.stroke(segments, with: .color(variant.tint), style: dashStroke)
+            ctx.stroke(segments, with: color, style: dashStroke)
 
         case .error:
             // ✕: two crossed lines from (9,13.5)→(15,17.5) and (15,13.5)→(9,17.5).
-            // Cap shell is tinted .red via variant.tint.
+            // Cap shell is tinted .red via drawColor.
             let cross = Path { p in
                 p.move(to: CGPoint(x: 9,  y: 13.5)); p.addLine(to: CGPoint(x: 15, y: 17.5))
                 p.move(to: CGPoint(x: 15, y: 13.5)); p.addLine(to: CGPoint(x: 9,  y: 17.5))
             }
-            ctx.stroke(cross, with: .color(variant.tint), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+            ctx.stroke(cross, with: color, style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
         }
     }
 
     private func drawUpdateBadge(in ctx: inout GraphicsContext) {
+        let color = GraphicsContext.Shading.color(variant.drawColor)
         // Corner badge: filled circle at (20, 6) r=3 with white ↓ glyph inside.
         // Sits in the upper-right outside the cap rect.
         let disc = Path(ellipseIn: CGRect(x: 17, y: 3, width: 6, height: 6))
-        ctx.fill(disc, with: .color(variant.tint))
+        ctx.fill(disc, with: color)
 
-        let arrow = Path { p in
-            p.move(to: CGPoint(x: 20,   y: 4.6))
-            p.addLine(to: CGPoint(x: 20, y: 7.4))
-            p.move(to: CGPoint(x: 18.7, y: 6.2))
-            p.addLine(to: CGPoint(x: 20, y: 7.5))
-            p.addLine(to: CGPoint(x: 21.3, y: 6.2))
+        // Punch the arrow out of the disc using `.destinationOut` blend mode
+        // so a separate overlay color isn't needed; works for both template
+        // and non-template renders.
+        ctx.drawLayer { layer in
+            layer.blendMode = .destinationOut
+            let arrow = Path { p in
+                p.move(to: CGPoint(x: 20,   y: 4.6))
+                p.addLine(to: CGPoint(x: 20, y: 7.4))
+                p.move(to: CGPoint(x: 18.7, y: 6.2))
+                p.addLine(to: CGPoint(x: 20, y: 7.5))
+                p.addLine(to: CGPoint(x: 21.3, y: 6.2))
+            }
+            layer.stroke(arrow, with: .color(.black), style: StrokeStyle(lineWidth: 0.9, lineCap: .round, lineJoin: .round))
         }
-        ctx.stroke(arrow, with: .color(.white), style: StrokeStyle(lineWidth: 0.9, lineCap: .round, lineJoin: .round))
     }
 }
 

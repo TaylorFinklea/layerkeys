@@ -196,27 +196,37 @@ struct SettingsView: View {
     }
 
     private var permissionsView: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        let inputGranted = model.permissionState != .denied
+        let accessibilityGranted = model.accessibilityGranted
+
+        return VStack(alignment: .leading, spacing: 16) {
             Text("Permissions")
                 .font(.title2.weight(.semibold))
 
-            Label(model.permissionState.title, systemImage: model.permissionState.isGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .foregroundStyle(model.permissionState.isGranted ? .green : .orange)
-
-            Text(model.permissionState.detail)
+            Text("LayerKeys needs Input Monitoring to read keyboard events globally. Accessibility is required to replay a plain Escape tap when you release the trigger without using a layer.")
                 .foregroundStyle(.secondary)
 
-            Text("LayerKeys needs Input Monitoring to read keyboard events globally. Accessibility is optional and only used to replay a normal Escape tap when you release Control+Space without using a layer.")
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                permissionRow(
+                    title: "Input Monitoring",
+                    granted: inputGranted,
+                    action: { model.requestInputMonitoring() }
+                )
 
-            HStack {
-                Button("Request Access") {
-                    model.requestPermission()
-                }
+                permissionRow(
+                    title: "Accessibility",
+                    granted: accessibilityGranted,
+                    action: { model.requestAccessibility() }
+                )
+            }
 
-                Button("Refresh Status") {
-                    model.refreshPermissionState()
-                    model.restartEventTap()
+            if !(inputGranted && accessibilityGranted) {
+                Text("After granting access in System Settings, restart LayerKeys so the global event tap picks up the new permissions.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Button("Restart LayerKeys") {
+                    model.relaunch()
                 }
             }
 
@@ -226,6 +236,29 @@ struct SettingsView: View {
             }
 
             Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private func permissionRow(
+        title: String,
+        granted: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 12) {
+            Label(
+                title,
+                systemImage: granted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(granted ? .green : .orange)
+
+            Spacer()
+
+            if !granted {
+                Button("Enable \(title)") {
+                    action()
+                }
+            }
         }
     }
 }

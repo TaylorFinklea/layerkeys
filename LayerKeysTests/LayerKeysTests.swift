@@ -978,13 +978,26 @@ final class LayerKeysTests: XCTestCase {
 
     // MARK: - MenuBarIconView.Variant data
 
-    func testVariantTintColors() {
-        XCTAssertEqual(MenuBarIconView.Variant.off.tint,        .primary)
-        XCTAssertEqual(MenuBarIconView.Variant.nav.tint,        .primary)
-        XCTAssertEqual(MenuBarIconView.Variant.numpad.tint,     .primary)
-        XCTAssertEqual(MenuBarIconView.Variant.listenOnly.tint, .primary)
-        XCTAssertEqual(MenuBarIconView.Variant.denied.tint,     .orange)
-        XCTAssertEqual(MenuBarIconView.Variant.error.tint,      .red)
+    func testVariantDrawColors() {
+        // Monochrome variants render as template images, so their drawColor
+        // is opaque black (AppKit substitutes the menu-bar text color via
+        // template substitution). Colored variants opt out of template
+        // rendering and keep their pixel color.
+        XCTAssertEqual(MenuBarIconView.Variant.off.drawColor,        .black)
+        XCTAssertEqual(MenuBarIconView.Variant.nav.drawColor,        .black)
+        XCTAssertEqual(MenuBarIconView.Variant.numpad.drawColor,     .black)
+        XCTAssertEqual(MenuBarIconView.Variant.listenOnly.drawColor, .black)
+        XCTAssertEqual(MenuBarIconView.Variant.denied.drawColor,     .orange)
+        XCTAssertEqual(MenuBarIconView.Variant.error.drawColor,      .red)
+    }
+
+    func testVariantTemplateRenderingFlag() {
+        XCTAssertTrue(MenuBarIconView.Variant.off.usesTemplateRendering)
+        XCTAssertTrue(MenuBarIconView.Variant.nav.usesTemplateRendering)
+        XCTAssertTrue(MenuBarIconView.Variant.numpad.usesTemplateRendering)
+        XCTAssertTrue(MenuBarIconView.Variant.listenOnly.usesTemplateRendering)
+        XCTAssertFalse(MenuBarIconView.Variant.denied.usesTemplateRendering)
+        XCTAssertFalse(MenuBarIconView.Variant.error.usesTemplateRendering)
     }
 
     func testVariantAccessibilityLabels() {
