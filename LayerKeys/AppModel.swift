@@ -127,33 +127,47 @@ final class AppModel: ObservableObject {
     }
 
     func requestInputMonitoring() {
-        // First call triggers the system prompt and registers LayerKeys in
-        // the Input Monitoring list. Subsequent calls return false silently
-        // once the user has denied — macOS won't re-prompt — so we also
-        // deep-link to the Settings pane as a recovery path.
+        // `CGRequestListenEventAccess` is the documented entry point, but
+        // empirically it doesn't always populate the Input Monitoring list
+        // after a prior denial. Combining the request with a real
+        // `CGEvent.tapCreate` attempt forces TCC to notice us — the tap
+        // fails to instantiate when permission is missing, and that
+        // failure is what triggers the daemon to add LayerKeys to the
+        // visible list.
         let granted = PermissionController.requestListenAccess()
+        PermissionController.probeInputMonitoringRegistration()
         refreshPermissionState()
         if granted {
             restartEventTap()
             return
         }
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-            NSWorkspace.shared.open(url)
-        }
+        openSettings(url: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")
     }
 
     func requestAccessibility() {
-        // CGRequestPostEventAccess prompts the first time; after a denial
-        // it just returns false. Deep-link to the Accessibility pane so the
-        // user can toggle LayerKeys on manually — the typical recovery
-        // path after the first prompt has been dismissed.
-        let granted = PermissionController.requestPostAccess()
+        // `AXIsProcessTrustedWithOptions` with the prompt option is the
+        // standard mechanism for registering an app in the Accessibility
+        // TCC list and reliably populates the list even after a prior
+        // denial — more so than `CGRequestPostEventAccess`. We still
+        // call the CG variant as a belt-and-braces measure.
+        let granted = PermissionController.requestAccessibilityWithPrompt()
+            || PermissionController.requestPostAccess()
         refreshPermissionState()
         if granted {
             restartEventTap()
             return
         }
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+        openSettings(url: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+    }
+
+    private func openSettings(url: String) {
+        // TCC's auto-add happens via XPC after the request returns, so
+        // we wait briefly before opening Settings — otherwise the pane
+        // is painted before LayerKeys has been added to the list and
+        // the user sees an empty entry. 500 ms is enough in practice
+        // and short enough to feel responsive.
+        guard let url = URL(string: url) else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             NSWorkspace.shared.open(url)
         }
     }
