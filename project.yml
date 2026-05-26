@@ -5,8 +5,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: 6.0
-    MARKETING_VERSION: 0.2.6
-    CURRENT_PROJECT_VERSION: 8
+    MARKETING_VERSION: 0.2.7
+    CURRENT_PROJECT_VERSION: 9
 packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
@@ -44,8 +44,8 @@ targets:
       path: LayerKeys/Info.plist
       properties:
         CFBundleDisplayName: LayerKeys
-        CFBundleShortVersionString: "0.2.6"
-        CFBundleVersion: "8"
+        CFBundleShortVersionString: "0.2.7"
+        CFBundleVersion: "9"
         LSApplicationCategoryType: public.app-category.utilities
         LSUIElement: true
         # Sparkle auto-update keys. The matching EdDSA private key is stored in the

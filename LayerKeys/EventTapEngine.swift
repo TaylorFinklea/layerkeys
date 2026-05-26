@@ -3,6 +3,10 @@ import Foundation
 
 final class EventTapEngine: NSObject {
     private static let syntheticEscapeEventTag: Int64 = 0x4C4B455343
+    /// Tag we stamp on events synthesized from `flagsChanged` modifier
+    /// remaps (e.g. Right ⌘ → Keypad 0). Tagged events skip the state
+    /// machine on re-entry through the tap so we don't recurse.
+    private static let syntheticRemapEventTag: Int64 = 0x4C4B5245_4D4150
 
     private let profileLock = NSLock()
     private var resolvedMappings: ResolvedMappings
@@ -110,6 +114,10 @@ final class EventTapEngine: NSObject {
         let eventMask =
             (1 << CGEventType.keyDown.rawValue)
             | (1 << CGEventType.keyUp.rawValue)
+            // flagsChanged is how macOS dispatches modifier presses;
+            // we need it for bindings whose source is a modifier
+            // (e.g. Right ⌘ → Keypad 0).
+            | (1 << CGEventType.flagsChanged.rawValue)
 
         let userInfo = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         guard let tapPort = CGEvent.tapCreate(
@@ -156,12 +164,19 @@ final class EventTapEngine: NSObject {
             return Unmanaged.passUnretained(event)
         }
 
-        guard type == .keyDown || type == .keyUp else {
+        guard type == .keyDown || type == .keyUp || type == .flagsChanged else {
             return Unmanaged.passUnretained(event)
         }
 
-        let isSyntheticEscape = event.getIntegerValueField(.eventSourceUserData)
-            == Self.syntheticEscapeEventTag
+        let userData = event.getIntegerValueField(.eventSourceUserData)
+        let isSyntheticEscape = userData == Self.syntheticEscapeEventTag
+        let isSyntheticRemap = userData == Self.syntheticRemapEventTag
+        // Tagged synthetic remap events must short-circuit immediately
+        // — they're our own re-entry from postRemappedModifierKey and
+        // they're already in their final form.
+        if isSyntheticRemap {
+            return Unmanaged.passUnretained(event)
+        }
         let keyCode = KeyCode(event.getIntegerValueField(.keyboardEventKeycode))
 
         profileLock.lock()
@@ -201,7 +216,61 @@ final class EventTapEngine: NSObject {
             }
             event.flags = flags
             return Unmanaged.passRetained(event)
+        case let .synthesizeKey(
+            remappedKeyCode,
+            isKeyDown,
+            setNumericPadFlag,
+            clearModifierKeyCode
+        ):
+            postRemappedModifierKey(
+                keyCode: remappedKeyCode,
+                isKeyDown: isKeyDown,
+                flagsBase: event.flags,
+                setNumericPadFlag: setNumericPadFlag,
+                clearModifierKeyCode: clearModifierKeyCode
+            )
+            // Consume the original flagsChanged so downstream apps
+            // don't also see the raw modifier press.
+            return nil
         }
+    }
+
+    /// Synthesizes a keyDown/keyUp event for a target keycode whose
+    /// trigger was a `flagsChanged` modifier transition. We can't just
+    /// rewrite the originating event's type, so we post a fresh
+    /// keyboard event through the HID event tap and consume the
+    /// original. The new event is tagged with
+    /// `syntheticRemapEventTag` so it bypasses the state machine on
+    /// re-entry through our tap.
+    private func postRemappedModifierKey(
+        keyCode: KeyCode,
+        isKeyDown: Bool,
+        flagsBase: CGEventFlags,
+        setNumericPadFlag: Bool,
+        clearModifierKeyCode: KeyCode
+    ) {
+        guard let source = CGEventSource(stateID: .hidSystemState),
+              let event = CGEvent(
+                  keyboardEventSource: source,
+                  virtualKey: keyCode,
+                  keyDown: isKeyDown
+              ) else {
+            return
+        }
+
+        var flags = stateMachine.outputFlags(for: flagsBase)
+        if let info = InputKey.modifierFlagInfo(forKeyCode: clearModifierKeyCode) {
+            flags.remove(info.device)
+            flags.remove(info.general)
+        }
+        if setNumericPadFlag {
+            flags.insert(.maskNumericPad)
+        } else {
+            flags.remove(.maskNumericPad)
+        }
+        event.flags = flags
+        event.setIntegerValueField(.eventSourceUserData, value: Self.syntheticRemapEventTag)
+        event.post(tap: .cghidEventTap)
     }
 
     private func postEscapeTap(flags: CGEventFlags) {

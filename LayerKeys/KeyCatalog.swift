@@ -24,6 +24,11 @@ enum InputKey: String, CaseIterable, Codable, Hashable, Identifiable {
 
     case sectionKey
 
+    case leftCommand
+    case rightCommand
+    case leftOption
+    case rightOption
+
     var id: String { rawValue }
 
     enum Category: CaseIterable {
@@ -31,6 +36,7 @@ enum InputKey: String, CaseIterable, Codable, Hashable, Identifiable {
         case digits
         case punctuation
         case iso
+        case modifiers
 
         var title: String {
             switch self {
@@ -38,6 +44,7 @@ enum InputKey: String, CaseIterable, Codable, Hashable, Identifiable {
             case .digits: return "Digits"
             case .punctuation: return "Punctuation & Space"
             case .iso: return "ISO"
+            case .modifiers: return "Modifiers"
             }
         }
     }
@@ -54,6 +61,8 @@ enum InputKey: String, CaseIterable, Codable, Hashable, Identifiable {
             return .punctuation
         case .sectionKey:
             return .iso
+        case .leftCommand, .rightCommand, .leftOption, .rightOption:
+            return .modifiers
         }
     }
 
@@ -86,6 +95,10 @@ enum InputKey: String, CaseIterable, Codable, Hashable, Identifiable {
         case .nine: return "9"
         case .zero: return "0"
         case .sectionKey: return "§"
+        case .leftCommand: return "Left \u{2318}"
+        case .rightCommand: return "Right \u{2318}"
+        case .leftOption: return "Left \u{2325}"
+        case .rightOption: return "Right \u{2325}"
         default:
             return rawValue.uppercased()
         }
@@ -142,7 +155,49 @@ enum InputKey: String, CaseIterable, Codable, Hashable, Identifiable {
         case .slash: return 0x2C
         case .space: return 0x31
         case .sectionKey: return 0x0A
+        case .leftCommand: return 0x37
+        case .rightCommand: return 0x36
+        case .leftOption: return 0x3A
+        case .rightOption: return 0x3D
         }
+    }
+
+    /// Modifier keys are dispatched by macOS as `flagsChanged` events
+    /// rather than `keyDown`/`keyUp`. Non-modifier keys return `nil`.
+    /// Per-side modifier state is exposed via device-specific bits on
+    /// `CGEventFlags` — these are the public `NX_DEVICE*KEYMASK` bits
+    /// from `IOLLEvent.h`; they live on `CGEventFlags` despite not
+    /// being members of the Swift enum. The `general` flag is the
+    /// side-agnostic mask used to strip the modifier from a remapped
+    /// event so apps don't see e.g. `Cmd+Keypad0`.
+    struct ModifierFlagInfo {
+        let device: CGEventFlags
+        let general: CGEventFlags
+    }
+
+    var modifierFlagInfo: ModifierFlagInfo? {
+        switch self {
+        case .leftCommand:
+            return ModifierFlagInfo(device: CGEventFlags(rawValue: 0x0000_0008), general: .maskCommand)
+        case .rightCommand:
+            return ModifierFlagInfo(device: CGEventFlags(rawValue: 0x0000_0010), general: .maskCommand)
+        case .leftOption:
+            return ModifierFlagInfo(device: CGEventFlags(rawValue: 0x0000_0020), general: .maskAlternate)
+        case .rightOption:
+            return ModifierFlagInfo(device: CGEventFlags(rawValue: 0x0000_0040), general: .maskAlternate)
+        default:
+            return nil
+        }
+    }
+
+    /// True for keys that arrive as `flagsChanged` events instead of
+    /// `keyDown`/`keyUp`.
+    var isModifierSource: Bool {
+        modifierFlagInfo != nil
+    }
+
+    static func modifierFlagInfo(forKeyCode keyCode: KeyCode) -> ModifierFlagInfo? {
+        allCases.first(where: { $0.keyCode == keyCode })?.modifierFlagInfo
     }
 }
 
@@ -410,6 +465,10 @@ struct MappingProfile: Codable, Hashable {
             NumpadBinding(source: .m, target: .keypad1),
             NumpadBinding(source: .comma, target: .keypad2),
             NumpadBinding(source: .period, target: .keypad3),
+            // Right ⌘ mirrors the thumb position of a real numpad's `0`
+            // key — it's a no-character modifier, so safe to remap while
+            // in numpad mode without clobbering normal typing.
+            NumpadBinding(source: .rightCommand, target: .keypad0),
         ]
     )
 
@@ -442,6 +501,10 @@ struct MappingProfile: Codable, Hashable {
             switch triggers.layerKey.category {
             case .letters, .digits, .punctuation, .iso:
                 issues.append(.triggerNeedsModifiers(triggers.layerKey))
+            case .modifiers:
+                // Pressing a modifier key alone never types a character,
+                // so it's safe as a layer trigger without additional flags.
+                break
             }
         }
 

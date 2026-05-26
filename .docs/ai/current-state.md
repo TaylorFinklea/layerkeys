@@ -8,7 +8,96 @@
 
 ## Last Session Summary
 
-**Date**: 2026-05-06 (M4b — menu-bar icon redesign)
+**Date**: 2026-05-25 (0.2.7 — Right ⌘ → Keypad 0)
+
+Added modifier keys as remap sources. Default profile now binds
+`rightCommand → keypad0`, restoring 0 in numpad mode at the thumb
+position of a real numpad. Architectural notes captured in
+`decisions.md` under the 2026-05-25 entry.
+
+- `LayerKeys/KeyCatalog.swift` — `InputKey` gains
+  `leftCommand`/`rightCommand`/`leftOption`/`rightOption` (keycodes
+  0x37 / 0x36 / 0x3A / 0x3D) and a new `.modifiers` category with
+  matching titles ("Right ⌘" etc.). `modifierFlagInfo` exposes both
+  the device-side bit (NX_DEVICE*KEYMASK) and the general flag
+  (`.maskCommand` / `.maskAlternate`) used for stripping.
+  `validateTriggers` treats modifier layer keys as valid without
+  requiring additional modifier flags.
+- `LayerKeys/EventTapEngine.swift` — event mask gains
+  `CGEventType.flagsChanged`. New `syntheticRemapEventTag` (separate
+  from `syntheticEscapeEventTag`) tags events synthesized from
+  modifier remaps; tagged events short-circuit before `decide()`.
+  `postRemappedModifierKey()` posts the synthesized
+  keyDown/keyUp via the HID tap and strips the source modifier's
+  device + general flag bits.
+- `LayerKeys/LayerStateMachine.swift` — `EventAction` gains a
+  `.synthesizeKey(...)` case. New private `decideFlagsChanged(...)`
+  derives the press edge from the device-side bit on `currentFlags`,
+  remaps only when the trigger is held and the modifier has a
+  binding in the current mode, and tracks synthesized keyDowns so
+  the matching keyUp fires even after the trigger releases (no stuck
+  keypad keys).
+- `MappingProfile.default.numpad` — appended
+  `NumpadBinding(source: .rightCommand, target: .keypad0)`.
+- 7 new unit tests cover the flagsChanged path: trigger-held remap,
+  pass-through when trigger not held, stuck-key avoidance on
+  trigger-release-before-modifier-release, and pass-through when the
+  modifier was pressed before the trigger engaged. Existing
+  `testInputKeyAllCases…` / `testInputKeyCategoryGrouping` updated
+  for the four new cases (53 total InputKey cases now). 91 tests pass.
+
+---
+
+**Earlier — 2026-05-25 (0.2.4–0.2.6 — menu-bar visibility + permission UX + Developer ID signing)**
+
+Shipped four releases addressing post-0.2.3 install regressions:
+
+- **0.2.4** (`f806b3a`) — fixed invisible menu-bar icon; reworked
+  permission UX with separate Input Monitoring / Accessibility rows,
+  per-row Enable buttons, and a Restart LayerKeys button (event tap
+  permission snapshot is kernel-bound at creation, so granting after
+  launch requires a fresh process).
+- **0.2.5** (`f63fb33`) — auto-populate LayerKeys in TCC list when
+  requesting permissions. `CGRequestListenEventAccess` alone is
+  unreliable; we now also call `CGEvent.tapCreate` (listen-only probe)
+  for Input Monitoring and `AXIsProcessTrustedWithOptions` for
+  Accessibility — both side-effect the TCC daemon into registering the
+  bundle. 500 ms delay before opening Settings so the XPC registration
+  lands first. `NSApp.activate(ignoringOtherApps:)` before
+  `openSettings()` because `LSUIElement: true` otherwise leaves the
+  window behind other apps.
+- **0.2.6** (`473d8de`) — permission rows hide themselves from the
+  status menu once both are granted (`AppModel.allPermissionsGranted`
+  gates `permissionsSection` in `StatusMenuView`). Settings still
+  shows the rows for reference.
+- **Signing fix** (`f79ab7f`, not version-bumped) — Release configs
+  now sign with Developer ID Application + team `K7CBQW6MPG` so the
+  cdhash stays stable across rebuilds. Previously, every release
+  produced a fresh adhoc cdhash, which made TCC's
+  designated-requirement check reject grants on each upgrade.
+
+Files of note from this stretch:
+
+- `LayerKeys/PermissionController.swift` — adds
+  `requestAccessibilityWithPrompt()` (string literal
+  `"AXTrustedCheckOptionPrompt"` because `kAXTrustedCheckOptionPrompt`
+  isn't Sendable under Swift 6) and
+  `probeInputMonitoringRegistration()`.
+- `LayerKeys/AppModel.swift` — split `requestPermission()` into
+  `requestInputMonitoring()` / `requestAccessibility()`; added
+  `relaunch()`, `accessibilityGranted`, `allPermissionsGranted`,
+  private `openSettings(url:)` with the 500 ms delay.
+- `LayerKeys/StatusMenuView.swift` — `permissionsSection` with
+  per-permission rows, gated by `!model.allPermissionsGranted`.
+- `project.yml` — bumped 0.2.4 → 0.2.5 → 0.2.6 (builds 6 → 7 → 8);
+  Release config now uses manual signing with Developer ID.
+
+Homebrew tap (`TaylorFinklea/homebrew-tap`) updated to 0.2.6 with
+sha256 `6cf58b8cb281d91aff8f4ef55e941b620acd7c2a57e3003238b1c5fbbd85e4be`.
+
+---
+
+**Earlier — 2026-05-06 (M4b — menu-bar icon redesign)**
 
 - **Brainstormed → speced → planned → implemented in one session.**
   Replaced the `Image(systemName:) + Text("LK"/"NAV"/"NUM")` menu-bar

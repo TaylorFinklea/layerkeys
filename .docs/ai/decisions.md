@@ -454,3 +454,41 @@ local iteration.
 - Symmetric composition (error-and-denied each overlay independently). Rejected: incoherent UX (can't be both "no permission" AND "tap died" simultaneously — denied implies the tap was never created).
 
 **Rationale**: Errors and permissions are blocking — they should preempt the mode display because the mode signal is irrelevant when the tap can't function. Listen-only is a partial-failure mode where the layers still work, so we show the listen-only marker but allow the user to infer mode from their interaction (they know whether they're holding the trigger). Update badge composes only on non-alert variants because stacking "update available" on top of "tap error" is incoherent — fix the error first.
+
+## [2026-05-25] Modifier keys as remap sources via flagsChanged
+
+**Context**: User asked for Right ⌘ to map to Keypad 0 (mirrors the thumb
+position of a real numpad's 0 key). `InputKey` was non-modifier only, and the
+event tap mask was keyDown | keyUp — modifier presses arrive as `flagsChanged`
+and weren't reaching the state machine at all.
+
+**Decision**: Add modifier `InputKey` cases (Left/Right ⌘ and ⌥) and extend
+the event-tap pipeline to handle `flagsChanged` events for any modifier that's
+bound as a remap source. When such a binding fires, synthesize a fresh
+keyDown/keyUp `CGEvent` for the target keycode via the HID event tap, strip
+both the side-specific device flag bit and the general modifier flag from the
+synthesized event so apps don't see e.g. `⌘+Keypad0`, and tag the synthesized
+event with `syntheticRemapEventTag` so it short-circuits on re-entry through
+the tap. The original `flagsChanged` is consumed (`return nil`) so downstream
+apps don't also see the raw modifier press.
+
+**Alternatives considered**:
+- Mutate the originating `flagsChanged` event in place (change its `type` to
+  `.keyDown` and rewrite the keycode). Rejected: `CGEvent.type` isn't
+  publicly settable in Swift, and the dispatch infrastructure expects
+  modifier presses through `flagsChanged` and key presses through keyDown —
+  morphing one into the other is fragile.
+- Per-modifier toggle tracking instead of reading the device-side flag bit
+  from `CGEventFlags`. Rejected: the device-side bits (NX_DEVICE*KEYMASK from
+  IOLLEvent.h, e.g. 0x10 for Right ⌘) are stable and present on
+  `CGEventFlags`, so we can self-correct from event state rather than rely on
+  cumulative toggles that drift on missed events.
+
+**Rationale**: The synthesize-and-post pattern matches the existing
+escape-replay path (`postEscapeTap`), so the operational footprint is
+familiar. Stripping the modifier flag is per-binding (only on synthesized
+events for modifier sources), not global — modifier presses outside layer
+mode continue to dispatch normally so system shortcuts (⌘C etc.) are
+untouched. Tracking synthesized keyDowns lets us emit the matching keyUp
+even when the user releases the layer trigger before releasing the modifier,
+preventing stuck keypad keys downstream.

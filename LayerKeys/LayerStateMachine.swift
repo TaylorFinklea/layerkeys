@@ -12,6 +12,18 @@ enum EventAction: Equatable {
     case enterLayerTrigger
     case exitLayerTrigger(emitEscape: Bool)
     case remap(keyCode: KeyCode, setNumericPadFlag: Bool)
+    /// Synthesize a fresh keyboard event because the originating event
+    /// was a `flagsChanged` for a modifier source — we can't just
+    /// rewrite its keycode and forward it like a normal remap.
+    /// `clearModifierKeyCode` identifies the source modifier whose
+    /// device + general flag bits must be stripped from the emitted
+    /// event so apps don't see e.g. `Cmd+Keypad0`.
+    case synthesizeKey(
+        keyCode: KeyCode,
+        isKeyDown: Bool,
+        setNumericPadFlag: Bool,
+        clearModifierKeyCode: KeyCode
+    )
 }
 
 struct EventDecision: Equatable {
@@ -25,6 +37,16 @@ struct LayerStateMachine {
     private(set) var shouldSwallowTriggerKeyUp = false
     private(set) var shouldEmitEscapeOnTriggerKeyUp = false
     private(set) var triggerKeyDownTimestamp: UInt64?
+
+    /// Source-modifier keycodes for which we've already synthesized a
+    /// keyDown for a remapped target. Used to emit the matching keyUp
+    /// even if the layer trigger has since released — otherwise the
+    /// downstream app would see a stuck keypad key.
+    private struct SynthesizedDown {
+        let target: KeyCode
+        let requiresNumericPadFlag: Bool
+    }
+    private var synthesizedDownsByModifierKeyCode: [KeyCode: SynthesizedDown] = [:]
 
     var triggers: TriggerProfile
 
@@ -135,11 +157,19 @@ struct LayerStateMachine {
         timestamp: UInt64,
         mappings: ResolvedMappings
     ) -> EventDecision {
-        guard eventType == .keyDown || eventType == .keyUp else {
+        if isSyntheticEscape {
             return EventDecision(action: .passThrough, modeDidChange: false)
         }
 
-        if isSyntheticEscape {
+        if eventType == .flagsChanged {
+            return decideFlagsChanged(
+                keyCode: keyCode,
+                currentFlags: currentFlags,
+                mappings: mappings
+            )
+        }
+
+        guard eventType == .keyDown || eventType == .keyUp else {
             return EventDecision(action: .passThrough, modeDidChange: false)
         }
 
@@ -176,6 +206,67 @@ struct LayerStateMachine {
             action: .remap(
                 keyCode: remapped,
                 setNumericPadFlag: mappings.targetRequiresNumericPadFlag(remapped)
+            ),
+            modeDidChange: false
+        )
+    }
+
+    /// Decide what to do with a `flagsChanged` event. macOS dispatches
+    /// modifier press/release as `flagsChanged` rather than
+    /// keyDown/keyUp, so we have to derive the press edge ourselves
+    /// from the device-side bit on `currentFlags`. Only modifiers that
+    /// are bound as a remap source (e.g. Right ⌘ → Keypad 0) cause us
+    /// to synthesize an event; everything else passes through so
+    /// normal modifier behavior (⌘C, ⌥-click, …) is preserved.
+    private mutating func decideFlagsChanged(
+        keyCode: KeyCode,
+        currentFlags: CGEventFlags,
+        mappings: ResolvedMappings
+    ) -> EventDecision {
+        guard let info = InputKey.modifierFlagInfo(forKeyCode: keyCode) else {
+            return EventDecision(action: .passThrough, modeDidChange: false)
+        }
+
+        let isPressed = !currentFlags.intersection(info.device).isEmpty
+
+        if isPressed {
+            // Only intercept if the trigger is held and this modifier
+            // has a binding in the current mode. Otherwise pass
+            // through so the user keeps normal Cmd / Option behavior.
+            guard isLayerTriggerHeld,
+                  let remapped = mappings.remappedKeyCode(for: keyCode, mode: mode) else {
+                return EventDecision(action: .passThrough, modeDidChange: false)
+            }
+            shouldEmitEscapeOnTriggerKeyUp = false
+            let requiresPad = mappings.targetRequiresNumericPadFlag(remapped)
+            synthesizedDownsByModifierKeyCode[keyCode] = SynthesizedDown(
+                target: remapped,
+                requiresNumericPadFlag: requiresPad
+            )
+            return EventDecision(
+                action: .synthesizeKey(
+                    keyCode: remapped,
+                    isKeyDown: true,
+                    setNumericPadFlag: requiresPad,
+                    clearModifierKeyCode: keyCode
+                ),
+                modeDidChange: false
+            )
+        }
+
+        // Release edge — only emit the matching keyUp if we previously
+        // synthesized a keyDown for this modifier. Do this even if the
+        // trigger has since released, otherwise the downstream app
+        // sees a stuck keypad key.
+        guard let entry = synthesizedDownsByModifierKeyCode.removeValue(forKey: keyCode) else {
+            return EventDecision(action: .passThrough, modeDidChange: false)
+        }
+        return EventDecision(
+            action: .synthesizeKey(
+                keyCode: entry.target,
+                isKeyDown: false,
+                setNumericPadFlag: entry.requiresNumericPadFlag,
+                clearModifierKeyCode: keyCode
             ),
             modeDidChange: false
         )

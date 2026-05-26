@@ -98,7 +98,7 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertEqual(NumpadTargetKey.keypadDecimal.keyCode, 0x41)
     }
 
-    func testDefaultNumpadProfileOnlyContainsNineDigitBindings() {
+    func testDefaultNumpadProfileBindings() {
         let mappings = MappingProfile.default.resolvedMappings
 
         XCTAssertEqual(mappings.remappedKeyCode(for: InputKey.u.keyCode, mode: .numpad), NumpadTargetKey.keypad7.keyCode)
@@ -110,6 +110,10 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertEqual(mappings.remappedKeyCode(for: InputKey.m.keyCode, mode: .numpad), NumpadTargetKey.keypad1.keyCode)
         XCTAssertEqual(mappings.remappedKeyCode(for: InputKey.comma.keyCode, mode: .numpad), NumpadTargetKey.keypad2.keyCode)
         XCTAssertEqual(mappings.remappedKeyCode(for: InputKey.period.keyCode, mode: .numpad), NumpadTargetKey.keypad3.keyCode)
+        XCTAssertEqual(
+            mappings.remappedKeyCode(for: InputKey.rightCommand.keyCode, mode: .numpad),
+            NumpadTargetKey.keypad0.keyCode
+        )
         XCTAssertNil(mappings.remappedKeyCode(for: InputKey.space.keyCode, mode: .numpad))
         XCTAssertNil(mappings.remappedKeyCode(for: InputKey.semicolon.keyCode, mode: .numpad))
     }
@@ -169,9 +173,10 @@ final class LayerKeysTests: XCTestCase {
             .grave, .minus, .equal, .leftBracket, .rightBracket, .backslash,
             .semicolon, .quote, .comma, .period, .slash, .space,
             .sectionKey,
+            .leftCommand, .rightCommand, .leftOption, .rightOption,
         ]
         XCTAssertEqual(Set(InputKey.allCases), expected)
-        XCTAssertEqual(InputKey.allCases.count, 49)
+        XCTAssertEqual(InputKey.allCases.count, 53)
     }
 
     func testInputKeyCategoryGrouping() {
@@ -179,6 +184,7 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertEqual(InputKey.cases(in: .digits).count, 10)
         XCTAssertEqual(InputKey.cases(in: .punctuation).count, 12)
         XCTAssertEqual(InputKey.cases(in: .iso).count, 1)
+        XCTAssertEqual(InputKey.cases(in: .modifiers).count, 4)
 
         let totalInCategories = InputKey.Category.allCases
             .reduce(0) { $0 + InputKey.cases(in: $1).count }
@@ -189,6 +195,161 @@ final class LayerKeysTests: XCTestCase {
         XCTAssertEqual(InputKey.space.category, .punctuation)
         XCTAssertEqual(InputKey.leftBracket.category, .punctuation)
         XCTAssertEqual(InputKey.sectionKey.category, .iso)
+        XCTAssertEqual(InputKey.rightCommand.category, .modifiers)
+        XCTAssertEqual(InputKey.leftOption.category, .modifiers)
+    }
+
+    func testModifierInputKeycodes() {
+        XCTAssertEqual(InputKey.leftCommand.keyCode, 0x37)
+        XCTAssertEqual(InputKey.rightCommand.keyCode, 0x36)
+        XCTAssertEqual(InputKey.leftOption.keyCode, 0x3A)
+        XCTAssertEqual(InputKey.rightOption.keyCode, 0x3D)
+    }
+
+    func testModifierFlagInfoMatchesDeviceBits() {
+        // Device-specific bits from IOLLEvent.h, preserved on
+        // CGEventFlags despite not being members of the Swift enum.
+        XCTAssertEqual(InputKey.leftCommand.modifierFlagInfo?.device, CGEventFlags(rawValue: 0x08))
+        XCTAssertEqual(InputKey.rightCommand.modifierFlagInfo?.device, CGEventFlags(rawValue: 0x10))
+        XCTAssertEqual(InputKey.leftOption.modifierFlagInfo?.device, CGEventFlags(rawValue: 0x20))
+        XCTAssertEqual(InputKey.rightOption.modifierFlagInfo?.device, CGEventFlags(rawValue: 0x40))
+
+        XCTAssertEqual(InputKey.rightCommand.modifierFlagInfo?.general, .maskCommand)
+        XCTAssertEqual(InputKey.leftOption.modifierFlagInfo?.general, .maskAlternate)
+        XCTAssertNil(InputKey.a.modifierFlagInfo)
+        XCTAssertNil(InputKey.space.modifierFlagInfo)
+    }
+
+    func testFlagsChangedRightCommandRemapsToKeypadZeroWhileInNumpadMode() {
+        var machine = LayerStateMachine()
+        let mappings = MappingProfile.default.resolvedMappings
+
+        _ = machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp)
+        _ = machine.handleKeyEvent(keyCode: InputKey.a.keyCode, isKeyDown: true)
+        XCTAssertEqual(machine.mode, .numpad)
+
+        // Right ⌘ press — device bit 0x10 now set in the event flags.
+        let downDecision = machine.decide(
+            eventType: .flagsChanged,
+            keyCode: InputKey.rightCommand.keyCode,
+            currentFlags: CGEventFlags(rawValue: 0x10).union(.maskCommand),
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp + 10_000_000,
+            mappings: mappings
+        )
+        XCTAssertEqual(downDecision.action, .synthesizeKey(
+            keyCode: NumpadTargetKey.keypad0.keyCode,
+            isKeyDown: true,
+            setNumericPadFlag: true,
+            clearModifierKeyCode: InputKey.rightCommand.keyCode
+        ))
+
+        // Right ⌘ release — device bit cleared.
+        let upDecision = machine.decide(
+            eventType: .flagsChanged,
+            keyCode: InputKey.rightCommand.keyCode,
+            currentFlags: [],
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp + 20_000_000,
+            mappings: mappings
+        )
+        XCTAssertEqual(upDecision.action, .synthesizeKey(
+            keyCode: NumpadTargetKey.keypad0.keyCode,
+            isKeyDown: false,
+            setNumericPadFlag: true,
+            clearModifierKeyCode: InputKey.rightCommand.keyCode
+        ))
+    }
+
+    func testFlagsChangedPassesThroughWhenTriggerNotHeld() {
+        var machine = LayerStateMachine()
+        let mappings = MappingProfile.default.resolvedMappings
+
+        let decision = machine.decide(
+            eventType: .flagsChanged,
+            keyCode: InputKey.rightCommand.keyCode,
+            currentFlags: CGEventFlags(rawValue: 0x10).union(.maskCommand),
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp,
+            mappings: mappings
+        )
+        XCTAssertEqual(decision.action, .passThrough)
+    }
+
+    func testFlagsChangedReleaseAfterTriggerReleaseStillEmitsKeyUp() {
+        // Press Right ⌘ while in numpad mode (synthesizes keypad 0
+        // keyDown), then release the trigger BEFORE releasing the
+        // modifier. The eventual modifier release must still emit
+        // a matching keyUp so the downstream app doesn't see a stuck
+        // keypad 0.
+        var machine = LayerStateMachine()
+        let mappings = MappingProfile.default.resolvedMappings
+
+        _ = machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp)
+        _ = machine.handleKeyEvent(keyCode: InputKey.a.keyCode, isKeyDown: true)
+        _ = machine.decide(
+            eventType: .flagsChanged,
+            keyCode: InputKey.rightCommand.keyCode,
+            currentFlags: CGEventFlags(rawValue: 0x10).union(.maskCommand),
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp + 1_000_000,
+            mappings: mappings
+        )
+        _ = machine.handleTriggerKeyUp(timestamp: triggerDownTimestamp + 2_000_000)
+        XCTAssertEqual(machine.mode, .off)
+        XCTAssertFalse(machine.isLayerTriggerHeld)
+
+        let upDecision = machine.decide(
+            eventType: .flagsChanged,
+            keyCode: InputKey.rightCommand.keyCode,
+            currentFlags: [],
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp + 3_000_000,
+            mappings: mappings
+        )
+        XCTAssertEqual(upDecision.action, .synthesizeKey(
+            keyCode: NumpadTargetKey.keypad0.keyCode,
+            isKeyDown: false,
+            setNumericPadFlag: true,
+            clearModifierKeyCode: InputKey.rightCommand.keyCode
+        ))
+    }
+
+    func testRightCommandPressedBeforeTriggerPassesThrough() {
+        // If the modifier is already held when the trigger engages,
+        // pressing it inside numpad mode shouldn't fire (we already
+        // saw the press before we cared). Only the release matters,
+        // and since we never synthesized a keyDown there's nothing
+        // to clean up — release also passes through.
+        var machine = LayerStateMachine()
+        let mappings = MappingProfile.default.resolvedMappings
+
+        // Modifier press happens before trigger — passes through.
+        let preDecision = machine.decide(
+            eventType: .flagsChanged,
+            keyCode: InputKey.rightCommand.keyCode,
+            currentFlags: CGEventFlags(rawValue: 0x10).union(.maskCommand),
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp,
+            mappings: mappings
+        )
+        XCTAssertEqual(preDecision.action, .passThrough)
+
+        _ = machine.handleTriggerKeyDown(timestamp: triggerDownTimestamp + 1)
+        _ = machine.handleKeyEvent(keyCode: InputKey.a.keyCode, isKeyDown: true)
+
+        // Modifier release inside numpad mode — no synthesized keyDown
+        // on record, so this also passes through (the original
+        // flagsChanged delivers naturally to the app).
+        let releaseDecision = machine.decide(
+            eventType: .flagsChanged,
+            keyCode: InputKey.rightCommand.keyCode,
+            currentFlags: [],
+            isSyntheticEscape: false,
+            timestamp: triggerDownTimestamp + 5_000_000,
+            mappings: mappings
+        )
+        XCTAssertEqual(releaseDecision.action, .passThrough)
     }
 
     func testTriggerProfileDefaultsMatchV010Behavior() {
